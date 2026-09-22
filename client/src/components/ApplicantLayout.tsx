@@ -1,0 +1,1 @@
+import{Link,Outlet}from"react-router-dom";export function ApplicantLayout(){return <><header className="topbar"><div><strong>USMS</strong><span> Admissions</span></div><nav><Link to="/admission/dashboard">Dashboard</Link></nav></header><main className="page"><Outlet/></main></>}
