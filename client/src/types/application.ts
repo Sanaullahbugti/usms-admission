@@ -1,0 +1,3 @@
+export type ApplicationStatus="DRAFT"|"SUBMITTED"|"UNDER_REVIEW"|"CHANGE_REQUESTED"|"RESUBMITTED"|"DOCUMENTS_VERIFIED"|"APPROVED"|"REJECTED"; export type PaymentStatus="PENDING"|"SUBMITTED"|"VERIFIED"|"REJECTED";
+export interface ApplicationSummary{id:string;applicationNo:string;applicantName:string;cnic:string;mobile:string;program:string;district:string;status:ApplicationStatus;paymentStatus:PaymentStatus;submittedAt:string}
+export interface ApplicantDashboardData{applicantName:string;applicationNo:string;admissionCycle:string;status:ApplicationStatus;completionPercentage:number;completedSections:string[];pendingSections:string[]}
