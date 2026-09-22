@@ -1,0 +1,38 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: usms
+          POSTGRES_PASSWORD: usms
+          POSTGRES_DB: usms_admission
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U usms -d usms_admission"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://usms:usms@localhost:5432/usms_admission?schema=public
+      JWT_SECRET: ci-only-secret-value-with-more-than-32-characters
+      CLIENT_ORIGIN: http://localhost:5173
+      COOKIE_SECURE: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install
+      - run: npm run db:generate
+      - run: npm exec --workspace server prisma migrate dev --name iteration_2 --create-only
+      - run: npm run db:seed
+        env:
+          SEED_ADMIN_PASSWORD: ci-development-password-only
+      - run: npm run typecheck
+      - run: npm run build
