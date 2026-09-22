@@ -1,0 +1,1 @@
+import type{ApplicationStatus}from"../types/application";export function StatusBadge({status}:{status:ApplicationStatus}){return <span className={`status status--${status.toLowerCase()}`}>{status.replaceAll("_"," ")}</span>}
