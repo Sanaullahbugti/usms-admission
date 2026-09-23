@@ -1,146 +1,175 @@
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "postgresql" url = env("DATABASE_URL") }
+generator client {
+  provider = "prisma-client-js"
+}
 
-enum ApplicationStatus { DRAFT SUBMITTED UNDER_REVIEW CHANGE_REQUESTED RESUBMITTED DOCUMENTS_VERIFIED APPROVED REJECTED }
-enum PaymentStatus { PENDING SUBMITTED VERIFIED REJECTED }
-enum AdmissionCycleStatus { DRAFT OPEN CLOSED ARCHIVED }
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  CHANGE_REQUESTED
+  RESUBMITTED
+  DOCUMENTS_VERIFIED
+  APPROVED
+  REJECTED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUBMITTED
+  VERIFIED
+  REJECTED
+}
+
+enum AdmissionCycleStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  ARCHIVED
+}
 
 model User {
-  id String @id @default(uuid())
-  email String @unique
-  phone String?
+  id           String        @id @default(uuid())
+  email        String        @unique
+  phone        String?
   passwordHash String
-  loginId String? @unique
-  isActive Boolean @default(true)
+  isActive     Boolean       @default(true)
   applications Application[]
-  roles UserRole[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  roles        UserRole[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
+
 model Role {
-  id String @id @default(uuid())
-  name String @unique
-  users UserRole[]
+  id          String           @id @default(uuid())
+  name        String           @unique
+  users       UserRole[]
   permissions RolePermission[]
 }
+
 model Permission {
-  id String @id @default(uuid())
-  key String @unique
+  id    String           @id @default(uuid())
+  key   String           @unique
   roles RolePermission[]
 }
+
 model UserRole {
   userId String
   roleId String
-  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
-  role Role @relation(fields:[roleId],references:[id],onDelete:Cascade)
-  @@id([userId,roleId])
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
 }
+
 model RolePermission {
-  roleId String
+  roleId       String
   permissionId String
-  role Role @relation(fields:[roleId],references:[id],onDelete:Cascade)
-  permission Permission @relation(fields:[permissionId],references:[id],onDelete:Cascade)
-  @@id([roleId,permissionId])
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
 }
+
 model AdmissionCycle {
-  id String @id @default(uuid())
-  name String
-  academicYear String
+  id                String               @id @default(uuid())
+  name              String
+  academicYear      String
   applicationPrefix String
-  status AdmissionCycleStatus @default(DRAFT)
-  startsAt DateTime?
-  endsAt DateTime?
-  applications Application[]
-  offerings ProgramOffering[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  status            AdmissionCycleStatus @default(DRAFT)
+  startsAt          DateTime?
+  endsAt            DateTime?
+  applications      Application[]
+  offerings         ProgramOffering[]
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 }
+
 model Program {
-  id String @id @default(uuid())
-  code String @unique
-  name String
-  degreeType String?
-  durationYears Decimal? @db.Decimal(3,1)
-  department String?
-  isActive Boolean @default(true)
-  offerings ProgramOffering[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String            @id @default(uuid())
+  code          String            @unique
+  name          String
+  degreeType    String?
+  durationYears Decimal?          @db.Decimal(3, 1)
+  department    String?
+  isActive      Boolean           @default(true)
+  offerings     ProgramOffering[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 }
+
 model ProgramOffering {
-  id String @id @default(uuid())
-  admissionCycleId String
-  programId String
-  minimumPercentage Decimal? @db.Decimal(5,2)
+  id                    String                     @id @default(uuid())
+  admissionCycleId      String
+  programId             String
+  minimumPercentage     Decimal?                   @db.Decimal(5, 2)
   minimumEducationYears Int?
-  availableSeats Int?
-  applicationFee Decimal? @db.Decimal(10,2)
-  isOpen Boolean @default(false)
-  admissionCycle AdmissionCycle @relation(fields:[admissionCycleId],references:[id])
-  program Program @relation(fields:[programId],references:[id])
-  choices ApplicationProgramChoice[]
-  @@unique([admissionCycleId,programId])
+  availableSeats        Int?
+  applicationFee        Decimal?                   @db.Decimal(10, 2)
+  isOpen                Boolean                    @default(false)
+  admissionCycle        AdmissionCycle             @relation(fields: [admissionCycleId], references: [id])
+  program               Program                    @relation(fields: [programId], references: [id])
+  choices               ApplicationProgramChoice[]
+
+  @@unique([admissionCycleId, programId])
 }
+
 model Application {
-  id String @id @default(uuid())
-  applicationNo String? @unique
-  userId String
+  id               String                     @id @default(uuid())
+  applicationNo    String?                    @unique
+  userId           String
   admissionCycleId String
-  status ApplicationStatus @default(DRAFT)
-  paymentStatus PaymentStatus @default(PENDING)
-  version Int @default(1)
-  submittedAt DateTime?
-  approvedAt DateTime?
-  rejectedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user User @relation(fields:[userId],references:[id])
-  admissionCycle AdmissionCycle @relation(fields:[admissionCycleId],references:[id])
-  profile ApplicantProfile?
-  programChoices ApplicationProgramChoice[]
-  reviews ApplicationReview[]
-  @@index([admissionCycleId,status])
+  status           ApplicationStatus          @default(DRAFT)
+  paymentStatus    PaymentStatus              @default(PENDING)
+  version          Int                        @default(1)
+  submittedAt      DateTime?
+  approvedAt       DateTime?
+  rejectedAt       DateTime?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  user             User                       @relation(fields: [userId], references: [id])
+  admissionCycle   AdmissionCycle             @relation(fields: [admissionCycleId], references: [id])
+  profile          ApplicantProfile?
+  programChoices   ApplicationProgramChoice[]
+
+  @@unique([userId, admissionCycleId])
+  @@index([admissionCycleId, status])
   @@index([userId])
-  @@unique([userId,admissionCycleId])
 }
+
 model ApplicantProfile {
-  id String @id @default(uuid())
-  applicationId String @unique
-  applicantName String
-  fatherName String
-  guardianName String?
-  surname String?
-  gender String?
-  fatherOccupation String?
-  mobile String?
-  domicileDistrict String?
-  nationality String?
-  dateOfBirth DateTime?
-  email String?
-  province String?
-  cnicBform String?
-  postalAddress String?
+  id                 String      @id @default(uuid())
+  applicationId      String      @unique
+  applicantName      String
+  fatherName         String
+  guardianName       String?
+  surname            String?
+  gender             String?
+  fatherOccupation   String?
+  mobile             String?
+  domicileDistrict   String?
+  nationality        String?
+  dateOfBirth        DateTime?
+  email              String?
+  province           String?
+  cnicBform          String?
+  postalAddress      String?
   residentialAddress String?
-  application Application @relation(fields:[applicationId],references:[id],onDelete:Cascade)
-  @@unique([cnicBform, applicationId])
+  application        Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 }
-model ApplicationReview {
-  id String @id @default(uuid())
-  applicationId String
-  reviewerId String?
-  action String
-  message String?
-  createdAt DateTime @default(now())
-  application Application @relation(fields:[applicationId],references:[id],onDelete:Cascade)
-  @@index([applicationId,createdAt])
-}
+
 model ApplicationProgramChoice {
-  id String @id @default(uuid())
-  applicationId String
+  id                String          @id @default(uuid())
+  applicationId     String
   programOfferingId String
-  preferenceOrder Int
-  application Application @relation(fields:[applicationId],references:[id],onDelete:Cascade)
-  programOffering ProgramOffering @relation(fields:[programOfferingId],references:[id])
-  @@unique([applicationId,preferenceOrder])
-  @@unique([applicationId,programOfferingId])
+  preferenceOrder   Int
+  application       Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  programOffering   ProgramOffering @relation(fields: [programOfferingId], references: [id])
+
+  @@unique([applicationId, preferenceOrder])
+  @@unique([applicationId, programOfferingId])
 }

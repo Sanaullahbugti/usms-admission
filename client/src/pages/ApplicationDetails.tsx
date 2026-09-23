@@ -1,2 +1,99 @@
-import{useState}from"react";import{useMutation,useQuery,useQueryClient}from"@tanstack/react-query";import{useParams}from"react-router-dom";import{StatusBadge}from"../components/StatusBadge";import{applicationService}from"../services/applicationService";export function ApplicationDetails(){const{id=""}=useParams(),qc=useQueryClient();const[message,setMessage]=useState("");const{data,isLoading}=useQuery({queryKey:["application",id],queryFn:()=>applicationService.getApplication(id)});const review=useMutation({mutationFn:({action,message}:{action:string;message?:string})=>applicationService.review(id,action,message),onSuccess:()=>{setMessage("");qc.invalidateQueries({queryKey:["application",id]});qc.invalidateQueries({queryKey:["applications"]})}});if(isLoading)return <p>Opening application file...</p>;if(!data)return <p>Application not found.</p>;const act=(action:string)=>review.mutate({action,message:message||undefined});return <section><div className="page-heading"><div><p className="eyebrow">{data.applicationNo}</p><h1>{data.applicantName}</h1><p>{data.program} · {data.district}</p></div><StatusBadge status={data.status}/></div><div className="actions"><button className="secondary" onClick={()=>act("START_REVIEW")}>Start Review</button><button onClick={()=>act("APPROVE")}>Approve</button><button className="danger" onClick={()=>act("REJECT")}>Reject</button><button className="secondary" onClick={()=>window.print()}>Print Candidate Form</button></div><div className="file-layout"><aside className="section-list"><button className="active">Candidate File</button><button>Review History</button></aside><div><article className="panel"><h2>Candidate information</h2><dl className="details"><div><dt>Application Number</dt><dd>{data.applicationNo}</dd></div><div><dt>CNIC / B-Form</dt><dd>{data.cnic}</dd></div><div><dt>Father's Name</dt><dd>{data.fatherName||"—"}</dd></div><div><dt>Mobile</dt><dd>{data.mobile}</dd></div><div><dt>Email</dt><dd>{data.email||"—"}</dd></div><div><dt>Domicile</dt><dd>{data.district}</dd></div><div><dt>Payment</dt><dd>{data.paymentStatus}</dd></div><div><dt>Submitted</dt><dd>{data.submittedAt}</dd></div></dl><h3>Program preferences</h3>{data.programChoices?.map(x=><p key={x.preferenceOrder}><strong>{x.preferenceOrder}.</strong> {x.programOffering.program.name}</p>)}</article><article className="panel"><h2>Request correction</h2><p>Write exactly what the applicant needs to correct. They will see this in their portal.</p><textarea className="review-message" rows={4} value={message} onChange={e=>setMessage(e.target.value)} placeholder="Example: Please correct your CNIC number and upload a clear marksheet."/>
-<button disabled={!message.trim()||review.isPending} onClick={()=>act("REQUEST_CHANGES")}>Send change request</button></article><article className="panel"><h2>Review history</h2>{data.reviews?.length?data.reviews.map(r=><div className="history-item" key={r.id}><strong>{r.action.replaceAll("_"," ")}</strong><span>{new Date(r.createdAt).toLocaleString()}</span>{r.message&&<p>{r.message}</p>}</div>):<p>No review activity yet.</p>}</article></div></div></section>}
+import { useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { StatusBadge } from "../components/StatusBadge";
+import { applicationService } from "../services/applicationService";
+
+const sections = ["Overview", "Personal", "Education", "Payment"] as const;
+
+export function ApplicationDetails() {
+  const { id } = useParams<{ id: string }>();
+  const [section, setSection] = useState<(typeof sections)[number]>("Overview");
+  const [notice, setNotice] = useState("");
+  const application = useQuery({
+    queryKey: ["admin-application", id],
+    queryFn: () => applicationService.getApplication(id ?? ""),
+    enabled: Boolean(id),
+  });
+
+  if (application.isPending) {
+    return <p>Loading application...</p>;
+  }
+
+  if (!application.data) {
+    return (
+      <p>
+        Application not found. <Link to="/admin/applications">Back to applications</Link>
+      </p>
+    );
+  }
+
+  const row = application.data;
+
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">{row.applicationNo}</p>
+          <h1>{row.applicantName}</h1>
+        </div>
+        <StatusBadge status={row.status} />
+      </div>
+      <div className="file-layout">
+        <aside className="section-list">
+          {sections.map((item) => (
+            <button key={item} className={item === section ? "active" : undefined} type="button" onClick={() => setSection(item)}>
+              {item}
+            </button>
+          ))}
+        </aside>
+        <section className="panel">
+          <dl className="details">
+            {section === "Overview" ? (
+              <>
+                <div><dt>Application no.</dt><dd>{row.applicationNo}</dd></div>
+                <div><dt>Submitted</dt><dd>{row.submittedAt}</dd></div>
+                <div><dt>Status</dt><dd>{row.status.replaceAll("_", " ")}</dd></div>
+                <div><dt>Payment</dt><dd>{row.paymentStatus.replaceAll("_", " ")}</dd></div>
+              </>
+            ) : null}
+            {section === "Personal" ? (
+              <>
+                <div><dt>Name</dt><dd>{row.applicantName}</dd></div>
+                <div><dt>CNIC</dt><dd>{row.cnic}</dd></div>
+                <div><dt>Mobile</dt><dd>{row.mobile}</dd></div>
+                <div><dt>District</dt><dd>{row.district}</dd></div>
+              </>
+            ) : null}
+            {section === "Education" ? (
+              <>
+                <div><dt>Program</dt><dd>{row.program}</dd></div>
+                <div><dt>HSC %</dt><dd>{row.hscPercentage.toFixed(1)}</dd></div>
+              </>
+            ) : null}
+            {section === "Payment" ? (
+              <div>
+                <dt>Challan</dt>
+                <dd>{row.paymentStatus.replaceAll("_", " ")}</dd>
+              </div>
+            ) : null}
+          </dl>
+          <div className="actions">
+            <button className="secondary" type="button" onClick={() => setNotice("Change requests will be sent through the API in a later iteration.")}>
+              Request change
+            </button>
+            <button type="button" onClick={() => setNotice("Approval is not wired to the API yet.")}>
+              Approve
+            </button>
+            <button className="danger" type="button" onClick={() => setNotice("Rejection is not wired to the API yet.")}>
+              Reject
+            </button>
+          </div>
+          {notice ? <p className="notice">{notice}</p> : (
+            <p className="notice">Admins do not silently edit submitted data. Use a change request.</p>
+          )}
+        </section>
+      </div>
+    </>
+  );
+}

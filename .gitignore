@@ -7,3 +7,7 @@ dist
 client/dist
 server/dist
 server/prisma/dev.db
+.cursor/mcp.json
+*.tsbuildinfo
+client/vite.config.js
+client/vite.config.d.ts

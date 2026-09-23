@@ -1,1 +1,81 @@
-import{useMemo,useState}from"react";import{useQuery}from"@tanstack/react-query";import{Link}from"react-router-dom";import{StatusBadge}from"../components/StatusBadge";import{applicationService}from"../services/applicationService";export function ApplicationsPage(){const[search,setSearch]=useState("");const[status,setStatus]=useState("");const{data=[]}=useQuery({queryKey:["applications"],queryFn:applicationService.listApplications});const filtered=useMemo(()=>data.filter(x=>[x.applicationNo,x.applicantName,x.cnic,x.mobile].join(" ").toLowerCase().includes(search.toLowerCase())&&(!status||x.status===status)),[data,search,status]);return <section><div className="page-heading"><div><p className="eyebrow">Admission Office</p><h1>Applications</h1></div></div><div className="filters"><input aria-label="Search applications" placeholder="Search application no, name, CNIC or mobile" value={search} onChange={e=>setSearch(e.target.value)}/><select aria-label="Filter status" value={status} onChange={e=>setStatus(e.target.value)}><option value="">All statuses</option><option>SUBMITTED</option><option>UNDER_REVIEW</option><option>CHANGE_REQUESTED</option><option>APPROVED</option><option>REJECTED</option></select></div><article className="panel"><div className="table-wrap"><table><thead><tr><th>Application</th><th>Applicant</th><th>CNIC</th><th>Program</th><th>District</th><th>Status</th><th>Payment</th><th></th></tr></thead><tbody>{filtered.map(x=><tr key={x.id}><td>{x.applicationNo}</td><td>{x.applicantName}</td><td>{x.cnic}</td><td>{x.program}</td><td>{x.district}</td><td><StatusBadge status={x.status}/></td><td>{x.paymentStatus}</td><td><Link to={`/admin/applications/${x.id}`}>Open file</Link></td></tr>)}</tbody></table></div></article></section>}
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { StatusBadge } from "../components/StatusBadge";
+import { applicationService } from "../services/applicationService";
+import type { ApplicationStatus } from "../types/application";
+
+export function ApplicationsPage() {
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<ApplicationStatus | "ALL">("ALL");
+  const applications = useQuery({
+    queryKey: ["admin-applications"],
+    queryFn: () => applicationService.listApplications(),
+  });
+
+  const rows = useMemo(() => {
+    const source = applications.data ?? [];
+    const needle = query.trim().toLowerCase();
+    return source.filter((row) => {
+      const matchesStatus = status === "ALL" || row.status === status;
+      const haystack = [row.applicationNo, row.applicantName, row.cnic, row.program, row.district].join(" ").toLowerCase();
+      return matchesStatus && (needle.length === 0 || haystack.includes(needle));
+    });
+  }, [applications.data, query, status]);
+
+  if (applications.isPending) {
+    return <p>Loading applications...</p>;
+  }
+
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Review queue</p>
+          <h1>All Applications</h1>
+        </div>
+      </div>
+      <div className="filters">
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search CNIC, app no, or name" />
+        <select value={status} onChange={(event) => setStatus(event.target.value as ApplicationStatus | "ALL")}>
+          <option value="ALL">All statuses</option>
+          <option value="UNDER_REVIEW">Under review</option>
+          <option value="CHANGE_REQUESTED">Change requested</option>
+          <option value="APPROVED">Approved</option>
+          <option value="REJECTED">Rejected</option>
+        </select>
+      </div>
+      <section className="panel">
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Applicant</th>
+                <th>Program</th>
+                <th>HSC %</th>
+                <th>Domicile</th>
+                <th>Challan</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  <td>
+                    <Link to={`/admin/applications/${row.id}`}>{row.applicantName}</Link>
+                    <div className="muted">{row.applicationNo}</div>
+                  </td>
+                  <td>{row.program}</td>
+                  <td>{row.hscPercentage.toFixed(1)}</td>
+                  <td>{row.district}</td>
+                  <td>{row.paymentStatus.replaceAll("_", " ")}</td>
+                  <td><StatusBadge status={row.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </>
+  );
+}

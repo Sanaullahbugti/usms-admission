@@ -1,1 +1,27 @@
-import{api}from"./api";import type{ApplicationSummary}from"../types/application";export type ApplicationDetail=ApplicationSummary&{fatherName?:string;email?:string;residentialAddress?:string;programChoices?:{preferenceOrder:number;programOffering:{program:{name:string}}}[];reviews?:{id:string;action:string;message?:string;createdAt:string}[]};const map=(a:any):ApplicationSummary=>({id:a.id,applicationNo:a.applicationNo??"",applicantName:a.applicantName??a.profile?.applicantName??"",cnic:a.cnic??a.profile?.cnicBform??"",mobile:a.mobile??a.profile?.mobile??"",program:a.program??a.programChoices?.[0]?.programOffering?.program?.name??"",district:a.district??a.profile?.domicileDistrict??"",status:a.status,paymentStatus:a.paymentStatus,submittedAt:a.submittedAt?String(a.submittedAt).slice(0,10):""});export const applicationService={async getApplicantDashboard(){const r=await api<{data:any}>("/v1/applications/me");const a=r.data;return{applicantName:a.profile?.applicantName??"",applicationNo:a.applicationNo??"",admissionCycle:a.admissionCycle?.name??"",status:a.status,completionPercentage:a.status==="DRAFT"?60:100,completedSections:["Personal Information","Program Choices","Submission"],pendingSections:a.status==="CHANGE_REQUESTED"?["Requested corrections"]:[]}},async listApplications(){const r=await api<{data:any[]}>("/v1/applications");return r.data.map(map)},async getApplication(id:string){const r=await api<{data:any}>(`/v1/applications/${id}`);return{...map(r.data),fatherName:r.data.profile?.fatherName,email:r.data.profile?.email,residentialAddress:r.data.profile?.residentialAddress,programChoices:r.data.programChoices,reviews:r.data.reviews}as ApplicationDetail},async review(id:string,action:string,message?:string){return api(`/v1/applications/${id}/review`,{method:"POST",body:JSON.stringify({action,message})})}};
+import { applicantDashboard, applications, programs, vcDashboard } from "../data/mockApplications";
+import type { ApplicantDashboardData, ApplicationSummary, ProgramOption, VcDashboardData } from "../types/application";
+
+const delay = (ms = 80) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export const applicationService = {
+  async getApplicantDashboard(): Promise<ApplicantDashboardData> {
+    await delay();
+    return applicantDashboard;
+  },
+  async listApplications(): Promise<ApplicationSummary[]> {
+    await delay();
+    return applications;
+  },
+  async getApplication(id: string): Promise<ApplicationSummary | null> {
+    await delay();
+    return applications.find((row) => row.id === id) ?? null;
+  },
+  async listPrograms(): Promise<ProgramOption[]> {
+    await delay();
+    return programs;
+  },
+  async getVcDashboard(): Promise<VcDashboardData> {
+    await delay();
+    return vcDashboard;
+  },
+};
