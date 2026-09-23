@@ -98,6 +98,7 @@ model Application {
   admissionCycle AdmissionCycle @relation(fields:[admissionCycleId],references:[id])
   profile ApplicantProfile?
   programChoices ApplicationProgramChoice[]
+  reviews ApplicationReview[]
   @@index([admissionCycleId,status])
   @@index([userId])
   @@unique([userId,admissionCycleId])
@@ -121,6 +122,17 @@ model ApplicantProfile {
   postalAddress String?
   residentialAddress String?
   application Application @relation(fields:[applicationId],references:[id],onDelete:Cascade)
+  @@unique([cnicBform, applicationId])
+}
+model ApplicationReview {
+  id String @id @default(uuid())
+  applicationId String
+  reviewerId String?
+  action String
+  message String?
+  createdAt DateTime @default(now())
+  application Application @relation(fields:[applicationId],references:[id],onDelete:Cascade)
+  @@index([applicationId,createdAt])
 }
 model ApplicationProgramChoice {
   id String @id @default(uuid())
