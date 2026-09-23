@@ -6,6 +6,7 @@ import { authRouter } from "./modules/auth/auth.routes.js";
 import { admissionConfigRouter } from "./modules/admission-config/admission-config.routes.js";
 import { dashboardRouter } from "./modules/dashboard/dashboard.routes.js";
 import { rateLimit } from "./middleware/rateLimit.js";
+import { applicationsRouter } from "./modules/applications/applications.routes.js";
 
 export const app=express();
 app.disable("x-powered-by");
@@ -16,5 +17,6 @@ app.get("/api/health",(_req,res)=>res.json({data:{status:"ok",service:"usms-admi
 app.use("/api/v1/auth",rateLimit(10,60_000),authRouter);
 app.use("/api/v1/dashboard",dashboardRouter);
 app.use("/api/v1/admission-config",admissionConfigRouter);
+app.use("/api/v1/applications",applicationsRouter);
 app.use((_req,res)=>res.status(404).json({error:{code:"NOT_FOUND",message:"Route not found"}}));
 app.use((error:unknown,_req:express.Request,res:express.Response,_next:express.NextFunction)=>{console.error(error);res.status(500).json({error:{code:"INTERNAL_ERROR",message:"Something went wrong"}})});
