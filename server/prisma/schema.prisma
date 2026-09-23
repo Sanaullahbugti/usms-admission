@@ -10,6 +10,7 @@ model User {
   email String @unique
   phone String?
   passwordHash String
+  loginId String? @unique
   isActive Boolean @default(true)
   applications Application[]
   roles UserRole[]
