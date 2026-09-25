@@ -5,7 +5,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../../database/prisma.js";
 import { sendApplicantCredentials } from "../../lib/mail.js";
-import { requireAuth, requirePermission, type AuthRequest } from "../../middleware/auth.js";
+import { hasPermission, requireAuth, requirePermission, type AuthRequest } from "../../middleware/auth.js";
 import { rateLimit } from "../../middleware/rateLimit.js";
 import { ensureDraftSchema } from "./draft-schema.js";
 
@@ -826,7 +826,7 @@ const review = z.object({
   message: z.string().max(1000).optional(),
 });
 
-applicationsRouter.post("/:id/review", requireAuth, requirePermission("application:review"), async (req: AuthRequest, res) => {
+applicationsRouter.post("/:id/review", requireAuth, async (req: AuthRequest, res) => {
   const id = typeof req.params.id === "string" ? req.params.id : "";
   if (!id) {
     return res.status(400).json({ error: { code: "VALIDATION_ERROR", message: "Application id is required" } });
@@ -834,6 +834,15 @@ applicationsRouter.post("/:id/review", requireAuth, requirePermission("applicati
   const parsed = review.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { code: "VALIDATION_ERROR", message: "Invalid review action" } });
+  }
+  const requiredPermission =
+    parsed.data.action === "APPROVE"
+      ? "application:approve"
+      : parsed.data.action === "REJECT"
+        ? "application:reject"
+        : "application:review";
+  if (!hasPermission(req, requiredPermission)) {
+    return res.status(403).json({ error: { code: "FORBIDDEN", message: "Your role does not allow this review action" } });
   }
   if (parsed.data.action === "REQUEST_CHANGES" && !parsed.data.message?.trim()) {
     return res.status(400).json({ error: { code: "MESSAGE_REQUIRED", message: "Tell the applicant what needs to be corrected" } });

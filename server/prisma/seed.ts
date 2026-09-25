@@ -14,6 +14,7 @@ const permissionKeys = [
   "program:manage",
   "cycle:manage",
   "user:manage",
+  "role:manage",
   "report:view",
   "audit:view",
   "vc:view",

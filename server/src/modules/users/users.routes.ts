@@ -5,22 +5,34 @@ import { prisma } from "../../database/prisma.js";
 import { requireAuth, requirePermission, type AuthRequest } from "../../middleware/auth.js";
 
 export const usersRouter = Router();
-const assignableRoles = ["VICE_CHANCELLOR"] as const;
-
 usersRouter.use(requireAuth, requirePermission("user:manage"));
+
+const createUserSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  roleIds: z.array(z.string().uuid()).default([]),
+});
+const updateRolesSchema = z.object({ roleIds: z.array(z.string().uuid()) });
+const updateStatusSchema = z.object({ isActive: z.boolean() });
 
 function mapUser(user: {
   id: string;
   email: string;
   isActive: boolean;
-  roles: { role: { name: string } }[];
+  roles: { role: { id: string; name: string } }[];
 }) {
   return {
     id: user.id,
     email: user.email,
     isActive: user.isActive,
-    roles: user.roles.map((item) => item.role.name),
+    roles: user.roles.map(({ role }) => ({ id: role.id, name: role.name })),
   };
+}
+
+async function validateRoles(roleIds: string[]) {
+  const ids = [...new Set(roleIds)];
+  const roles = await prisma.role.findMany({ where: { id: { in: ids } } });
+  return roles.length === ids.length ? ids : null;
 }
 
 usersRouter.get("/", async (_req, res) => {
@@ -32,93 +44,68 @@ usersRouter.get("/", async (_req, res) => {
 });
 
 usersRouter.post("/", async (req, res) => {
-  const parsed = z
-    .object({
-      email: z.string().email(),
-      password: z.string().min(8),
-      roleName: z.enum(assignableRoles).optional(),
-    })
-    .safeParse(req.body);
+  const parsed = createUserSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: { code: "VALIDATION_ERROR", message: "Enter a valid email, password and roles" } });
 
-  if (!parsed.success) {
-    return res.status(400).json({ error: { code: "VALIDATION_ERROR", message: "Invalid user details" } });
-  }
+  const roleIds = await validateRoles(parsed.data.roleIds);
+  if (!roleIds) return res.status(400).json({ error: { code: "INVALID_ROLE", message: "One or more selected roles do not exist" } });
 
   const email = parsed.data.email.toLowerCase();
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
+  if (await prisma.user.findUnique({ where: { email } })) {
     return res.status(409).json({ error: { code: "EMAIL_TAKEN", message: "A user with this email already exists" } });
   }
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
   const created = await prisma.user.create({
-    data: { email, passwordHash },
+    data: {
+      email,
+      passwordHash,
+      roles: { create: roleIds.map((roleId) => ({ roleId })) },
+    },
     include: { roles: { include: { role: true } } },
   });
-
-  if (parsed.data.roleName) {
-    const role = await prisma.role.findUnique({ where: { name: parsed.data.roleName } });
-    if (role) {
-      await prisma.userRole.create({ data: { userId: created.id, roleId: role.id } });
-    }
-  }
-
-  const user = await prisma.user.findUniqueOrThrow({
-    where: { id: created.id },
-    include: { roles: { include: { role: true } } },
-  });
-  res.status(201).json({ data: mapUser(user) });
+  res.status(201).json({ data: mapUser(created) });
 });
 
-usersRouter.post("/:id/roles", async (req: AuthRequest, res) => {
-  const userId = typeof req.params.id === "string" ? req.params.id : "";
-  const parsed = z.object({ roleName: z.enum(assignableRoles) }).safeParse(req.body);
-  if (!userId || !parsed.success) {
-    return res.status(400).json({ error: { code: "VALIDATION_ERROR", message: "Only the VICE_CHANCELLOR role can be assigned here" } });
+usersRouter.put("/:id/roles", async (req: AuthRequest, res) => {
+  const userId = String(req.params.id ?? "");
+  const parsed = updateRolesSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: { code: "VALIDATION_ERROR", message: "Select valid roles" } });
+
+  const user = await prisma.user.findUnique({ where: { id: userId }, include: { roles: { include: { role: true } } } });
+  if (!user) return res.status(404).json({ error: { code: "NOT_FOUND", message: "User not found" } });
+
+  const roleIds = await validateRoles(parsed.data.roleIds);
+  if (!roleIds) return res.status(400).json({ error: { code: "INVALID_ROLE", message: "One or more selected roles do not exist" } });
+
+  const isSelf = req.auth!.userId === userId;
+  const removingOwnSuperAdmin = isSelf && user.roles.some(({ role }) => role.name === "SUPER_ADMIN") &&
+    !(await prisma.role.findMany({ where: { id: { in: roleIds }, name: "SUPER_ADMIN" } })).length;
+  if (removingOwnSuperAdmin) {
+    return res.status(409).json({ error: { code: "SELF_LOCKOUT", message: "You cannot remove your own Super Admin access" } });
   }
 
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) {
-    return res.status(404).json({ error: { code: "NOT_FOUND", message: "User not found" } });
-  }
-
-  const role = await prisma.role.findUnique({ where: { name: parsed.data.roleName } });
-  if (!role) {
-    return res.status(404).json({ error: { code: "NOT_FOUND", message: "Role not found" } });
-  }
-
-  await prisma.userRole.upsert({
-    where: { userId_roleId: { userId: user.id, roleId: role.id } },
-    update: {},
-    create: { userId: user.id, roleId: role.id },
-  });
-
-  const updated = await prisma.user.findUniqueOrThrow({
-    where: { id: user.id },
-    include: { roles: { include: { role: true } } },
-  });
+  await prisma.$transaction([
+    prisma.userRole.deleteMany({ where: { userId } }),
+    ...(roleIds.length ? [prisma.userRole.createMany({ data: roleIds.map((roleId) => ({ userId, roleId })) })] : []),
+  ]);
+  const updated = await prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { roles: { include: { role: true } } } });
   res.json({ data: mapUser(updated) });
 });
 
-usersRouter.delete("/:id/roles/:roleName", async (req, res) => {
-  const userId = typeof req.params.id === "string" ? req.params.id : "";
-  const roleName = typeof req.params.roleName === "string" ? req.params.roleName : "";
-  if (!userId || !roleName || !assignableRoles.includes(roleName as (typeof assignableRoles)[number])) {
-    return res.status(400).json({ error: { code: "VALIDATION_ERROR", message: "Only the VICE_CHANCELLOR role can be removed here" } });
+usersRouter.patch("/:id/status", async (req: AuthRequest, res) => {
+  const userId = String(req.params.id ?? "");
+  const parsed = updateStatusSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: { code: "VALIDATION_ERROR", message: "Invalid user status" } });
+  if (req.auth!.userId === userId && !parsed.data.isActive) {
+    return res.status(409).json({ error: { code: "SELF_LOCKOUT", message: "You cannot disable your own account" } });
   }
-
-  const role = await prisma.role.findUnique({ where: { name: roleName } });
-  if (!role) {
-    return res.status(404).json({ error: { code: "NOT_FOUND", message: "Role not found" } });
-  }
-
-  await prisma.userRole.deleteMany({ where: { userId, roleId: role.id } });
-  const updated = await prisma.user.findUnique({
+  const exists = await prisma.user.findUnique({ where: { id: userId } });
+  if (!exists) return res.status(404).json({ error: { code: "NOT_FOUND", message: "User not found" } });
+  const updated = await prisma.user.update({
     where: { id: userId },
+    data: { isActive: parsed.data.isActive },
     include: { roles: { include: { role: true } } },
   });
-  if (!updated) {
-    return res.status(404).json({ error: { code: "NOT_FOUND", message: "User not found" } });
-  }
   res.json({ data: mapUser(updated) });
 });

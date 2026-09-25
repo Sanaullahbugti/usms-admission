@@ -22,9 +22,9 @@ async function loadSession(userId: string) {
     return null;
   }
   const roles = user.roles.map((item) => item.role.name);
-  const permissions = [
-    ...new Set(user.roles.flatMap((item) => item.role.permissions.map((entry) => entry.permission.key))),
-  ];
+  const permissions = roles.includes("SUPER_ADMIN")
+    ? ["*"]
+    : [...new Set(user.roles.flatMap((item) => item.role.permissions.map((entry) => entry.permission.key)))];
   return {
     id: user.id,
     email: user.email,

@@ -2,22 +2,14 @@ import { api } from "../lib/api";
 import type { ManagedUser } from "../types/auth";
 
 export const userService = {
-  list() {
-    return api<ManagedUser[]>("/v1/users");
+  list() { return api<ManagedUser[]>("/v1/users"); },
+  create(input: { email: string; password: string; roleIds: string[] }) {
+    return api<ManagedUser>("/v1/users", { method: "POST", body: JSON.stringify(input) });
   },
-  create(input: { email: string; password: string; roleName?: "VICE_CHANCELLOR" }) {
-    return api<ManagedUser>("/v1/users", {
-      method: "POST",
-      body: JSON.stringify(input),
-    });
+  setRoles(userId: string, roleIds: string[]) {
+    return api<ManagedUser>(`/v1/users/${userId}/roles`, { method: "PUT", body: JSON.stringify({ roleIds }) });
   },
-  grantViceChancellor(userId: string) {
-    return api<ManagedUser>(`/v1/users/${userId}/roles`, {
-      method: "POST",
-      body: JSON.stringify({ roleName: "VICE_CHANCELLOR" }),
-    });
-  },
-  revokeViceChancellor(userId: string) {
-    return api<ManagedUser>(`/v1/users/${userId}/roles/VICE_CHANCELLOR`, { method: "DELETE" });
+  setActive(userId: string, isActive: boolean) {
+    return api<ManagedUser>(`/v1/users/${userId}/status`, { method: "PATCH", body: JSON.stringify({ isActive }) });
   },
 };

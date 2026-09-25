@@ -9,6 +9,7 @@ import { authRouter } from "./modules/auth/auth.routes.js";
 import { admissionConfigRouter } from "./modules/admission-config/admission-config.routes.js";
 import { applicationsRouter } from "./modules/applications/applications.routes.js";
 import { documentsRouter } from "./modules/applications/documents.routes.js";
+import { rolesRouter } from "./modules/roles/roles.routes.js";
 import { usersRouter } from "./modules/users/users.routes.js";
 
 ensureUploadsDir();
@@ -21,6 +22,7 @@ app.use(cookieParser());
 app.get("/api/health", (_req, res) => res.json({ data: { status: "ok", service: "usms-admission-api" } }));
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", usersRouter);
+app.use("/api/v1/roles", rolesRouter);
 app.use("/api/v1/admission-config", admissionConfigRouter);
 app.use("/api/v1/applications", documentsRouter);
 app.use("/api/v1/applications", applicationsRouter);
@@ -30,12 +32,8 @@ const serveSpa = existsSync(join(clientDist, "index.html"));
 if (serveSpa) {
   app.use(express.static(clientDist, { index: false }));
   app.use((req, res, next) => {
-    if (req.method !== "GET" && req.method !== "HEAD") {
-      return next();
-    }
-    if (req.path.startsWith("/api")) {
-      return next();
-    }
+    if (req.method !== "GET" && req.method !== "HEAD") return next();
+    if (req.path.startsWith("/api")) return next();
     return res.sendFile(join(clientDist, "index.html"));
   });
 }
