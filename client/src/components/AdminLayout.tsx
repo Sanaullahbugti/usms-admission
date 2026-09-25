@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthProvider";
 import { applicationService } from "../services/applicationService";
-import { hasRole } from "../types/auth";
+import { hasPermission } from "../types/auth";
 
 function initials(email: string) {
   const local = email.split("@")[0] ?? "AD";
@@ -26,10 +26,13 @@ function roleLabel(roles: string[]) {
 export function AdminLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const canOpenVc = hasRole(user, "SUPER_ADMIN", "VICE_CHANCELLOR");
+  const canOpenVc = hasPermission(user, "vc:view");
+  const canViewApplications = hasPermission(user, "application:view");
+  const canManageAccess = hasPermission(user, "user:manage") || hasPermission(user, "role:manage");
   const applications = useQuery({
     queryKey: ["admin-applications"],
     queryFn: () => applicationService.listApplications(),
+    enabled: canViewApplications,
   });
   const rows = applications.data ?? [];
   const challanOpen = rows.filter((row) => row.paymentStatus !== "VERIFIED").length;
@@ -47,15 +50,19 @@ export function AdminLayout() {
             </div>
           </div>
           <nav className="cc-nav">
-            <NavLink to="/admin/dashboard">
-              <span className="ms">dashboard</span>
-              <span>Command Center</span>
-            </NavLink>
-            <NavLink to="/admin/applications">
-              <span className="ms">folder_shared</span>
-              <span>All Applications</span>
-              <em>{rows.length}</em>
-            </NavLink>
+            {canViewApplications ? (
+              <>
+                <NavLink to="/admin/dashboard">
+                  <span className="ms">dashboard</span>
+                  <span>Command Center</span>
+                </NavLink>
+                <NavLink to="/admin/applications">
+                  <span className="ms">folder_shared</span>
+                  <span>All Applications</span>
+                  <em>{rows.length}</em>
+                </NavLink>
+              </>
+            ) : null}
             <span className="cc-nav-muted">
               <span className="ms">payments</span>
               <span>Challan Verification</span>
@@ -73,10 +80,12 @@ export function AdminLayout() {
               <span className="ms">rule</span>
               <span>Eligibility Rules</span>
             </span>
-            <NavLink to="/admin/users">
-              <span className="ms">group</span>
-              <span>Users</span>
-            </NavLink>
+            {canManageAccess ? (
+              <NavLink to="/admin/users">
+                <span className="ms">admin_panel_settings</span>
+                <span>Users & Roles</span>
+              </NavLink>
+            ) : null}
             {canOpenVc ? (
               <NavLink to="/vc/dashboard">
                 <span className="ms">account_balance</span>
