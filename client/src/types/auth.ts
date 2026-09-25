@@ -1,4 +1,4 @@
-export type RoleName = "SUPER_ADMIN" | "VICE_CHANCELLOR";
+export type RoleName = "SUPER_ADMIN" | "VICE_CHANCELLOR" | "APPLICANT";
 
 export interface SessionUser {
   id: string;

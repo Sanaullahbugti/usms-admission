@@ -1,9 +1,11 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  engineType      = "client"
+  previewFeatures = ["driverAdapters", "queryCompiler"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -25,6 +27,12 @@ enum PaymentStatus {
   REJECTED
 }
 
+enum DocumentStatus {
+  UPLOADED
+  VERIFIED
+  REJECTED
+}
+
 enum AdmissionCycleStatus {
   DRAFT
   OPEN
@@ -35,6 +43,7 @@ enum AdmissionCycleStatus {
 model User {
   id           String        @id @default(uuid())
   email        String        @unique
+  loginId      String?       @unique
   phone        String?
   passwordHash String
   isActive     Boolean       @default(true)
@@ -135,31 +144,88 @@ model Application {
   admissionCycle   AdmissionCycle             @relation(fields: [admissionCycleId], references: [id])
   profile          ApplicantProfile?
   programChoices   ApplicationProgramChoice[]
+  education        ApplicationEducation[]
+  reviews          ApplicationReview[]
+  documents        ApplicationDocument[]
 
   @@unique([userId, admissionCycleId])
   @@index([admissionCycleId, status])
   @@index([userId])
 }
 
+model ApplicationDocument {
+  id            String         @id @default(uuid())
+  applicationId String
+  docType       String         @db.VarChar(40)
+  originalName  String         @db.VarChar(255)
+  mimeType      String         @db.VarChar(120)
+  sizeBytes     Int
+  storageKey    String         @db.VarChar(500)
+  status        DocumentStatus @default(UPLOADED)
+  uploadedAt    DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  application   Application    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, docType])
+  @@index([applicationId])
+}
+
+model ApplicationReview {
+  id            String      @id @default(uuid())
+  applicationId String
+  reviewerId    String?
+  action        String
+  message       String?     @db.Text
+  createdAt     DateTime    @default(now())
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+}
+
 model ApplicantProfile {
   id                 String      @id @default(uuid())
   applicationId      String      @unique
-  applicantName      String
-  fatherName         String
-  guardianName       String?
-  surname            String?
-  gender             String?
-  fatherOccupation   String?
-  mobile             String?
-  domicileDistrict   String?
-  nationality        String?
+  applicantName      String      @db.VarChar(120)
+  fatherName         String      @db.VarChar(120)
+  guardianName       String?     @db.VarChar(120)
+  surname            String?     @db.VarChar(120)
+  gender             String?     @db.VarChar(20)
+  fatherOccupation   String?     @db.VarChar(120)
+  mobile             String?     @db.VarChar(20)
+  domicileDistrict   String?     @db.VarChar(80)
+  nationality        String?     @db.VarChar(80)
   dateOfBirth        DateTime?
-  email              String?
-  province           String?
-  cnicBform          String?
-  postalAddress      String?
-  residentialAddress String?
+  email              String?     @db.VarChar(191)
+  province           String?     @db.VarChar(80)
+  cnicBform          String?     @db.VarChar(20)
+  postalAddress      String?     @db.VarChar(300)
+  residentialAddress String?     @db.VarChar(300)
+  householdIncome    String?     @db.VarChar(120)
+  emergencyContact   String?     @db.VarChar(160)
+  emergencyPhone     String?     @db.VarChar(20)
+  hasSibling         Boolean     @default(false)
+  siblingName        String?     @db.VarChar(120)
+  siblingRegNo       String?     @db.VarChar(60)
   application        Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+}
+
+model ApplicationEducation {
+  id              String      @id @default(uuid())
+  applicationId   String
+  level           String      @db.VarChar(10)
+  group           String?     @db.VarChar(80)
+  board           String?     @db.VarChar(120)
+  year            String?     @db.VarChar(10)
+  obtainedMarks   String?     @db.VarChar(20)
+  totalMarks      String?     @db.VarChar(20)
+  rollNumber      String?     @db.VarChar(60)
+  institutionType String?     @db.VarChar(80)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, level])
+  @@index([applicationId])
 }
 
 model ApplicationProgramChoice {

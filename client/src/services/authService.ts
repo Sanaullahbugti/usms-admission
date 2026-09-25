@@ -23,5 +23,5 @@ export function homePathFor(user: SessionUser) {
   if (user.roles.includes("VICE_CHANCELLOR")) {
     return "/vc/dashboard";
   }
-  return "/admission/dashboard";
+  return "/application";
 }

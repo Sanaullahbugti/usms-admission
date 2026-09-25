@@ -1,7 +1,43 @@
 {
-  "name":"@usms/server","private":true,"type":"module",
-  "scripts":{"dev":"tsx watch src/server.ts","build":"tsc -p tsconfig.json","typecheck":"tsc -p tsconfig.json --noEmit","start":"node dist/server.js","db:generate":"prisma generate","db:migrate":"prisma migrate dev","db:seed":"tsx prisma/seed.ts"},
-  "dependencies":{"@prisma/client":"^6.16.2","bcryptjs":"^3.0.2","cookie-parser":"^1.4.7","cors":"^2.8.5","express":"^5.1.0","jsonwebtoken":"^9.0.2","pino":"^9.9.4","zod":"^4.1.11"},
-  "devDependencies":{"@types/cookie-parser":"^1.4.9","@types/cors":"^2.8.19","@types/express":"^5.0.3","@types/jsonwebtoken":"^9.0.10","@types/node":"^24.5.2","prisma":"^6.16.2","tsx":"^4.20.5","typescript":"^5.9.2"},
-  "prisma":{"seed":"tsx prisma/seed.ts"}
+  "name": "@usms/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json && mkdir -p dist/assets && cp -R assets/. dist/assets/",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/server.js",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/adapter-mariadb": "^6.19.3",
+    "@prisma/client": "^6.16.2",
+    "bcryptjs": "^3.0.2",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mariadb": "^3.5.4",
+    "multer": "^2.4.0",
+    "nodemailer": "^10.0.10",
+    "pino": "^9.9.4",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.9",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^24.5.2",
+    "@types/nodemailer": "^8.0.2",
+    "prisma": "^6.16.2",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
 }

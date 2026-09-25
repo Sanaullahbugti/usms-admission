@@ -1,1 +1,186 @@
-import{FormEvent,useEffect,useState}from"react";import{Link}from"react-router-dom";import{api}from"../services/api";type Offering={id:string;program:{name:string}};export function PublicApplyPage(){const[offerings,setOfferings]=useState<Offering[]>([]),[programs,setPrograms]=useState<string[]>([]),[error,setError]=useState(""),[result,setResult]=useState<{applicationNo:string;temporaryPassword:string}|null>(null),[busy,setBusy]=useState(false);useEffect(()=>{api<{data:{id:string}[]}>("/v1/admission-config/cycles").then(async r=>{const open=r.data[0];if(open){const o=await api<{data:Offering[]}>(`/v1/admission-config/cycles/${open.id}/offerings`);setOfferings(o.data)}}).catch(()=>setError("Admission configuration is unavailable."))},[]);async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();setBusy(true);setError("");const fd=new FormData(e.currentTarget);try{const r=await api<{data:{applicationNo:string;temporaryPassword:string}}>("/v1/applications/public/submit",{method:"POST",body:JSON.stringify({applicantName:fd.get("applicantName"),fatherName:fd.get("fatherName"),cnicBform:fd.get("cnicBform"),email:fd.get("email"),mobile:fd.get("mobile"),dateOfBirth:fd.get("dateOfBirth")||undefined,gender:fd.get("gender")||undefined,domicileDistrict:fd.get("domicileDistrict"),province:fd.get("province")||undefined,nationality:"Pakistani",residentialAddress:fd.get("residentialAddress"),programOfferingIds:programs})});setResult(r.data)}catch(e){setError(e instanceof Error?e.message:"Could not submit application")}finally{setBusy(false)}}if(result)return <main className="public-page"><section className="success-card"><div className="success-mark">✓</div><h1>Application submitted</h1><p>Your application has been received by USMS.</p><div className="credential-box"><span>Applicant ID</span><strong>{result.applicationNo}</strong><span>Temporary password</span><strong>{result.temporaryPassword}</strong></div><p><strong>Save these details.</strong> You will use them to check status and respond to correction requests.</p><Link className="button-link" to="/login">Go to applicant login</Link></section></main>;return <main className="public-page"><header className="public-header"><div><strong>USMS</strong><span>University Admissions</span></div><Link to="/login">Applicant / Staff Login</Link></header><section className="apply-shell"><div className="apply-intro"><p className="eyebrow">Online Admissions</p><h1>Start your application</h1><p>Complete the form carefully. You can select up to three programs in order of preference.</p><div className="secure-note">🔒 Your information is submitted over a secured application service. Duplicate submissions are prevented.</div></div><form className="apply-form" onSubmit={submit}><h2>Personal information</h2><div className="form-grid"><label>Applicant name<input name="applicantName" required/></label><label>Father's name<input name="fatherName" required/></label><label>CNIC / B-Form<input name="cnicBform" required placeholder="41304-1234567-1"/></label><label>Mobile<input name="mobile" required inputMode="tel"/></label><label>Email<input name="email" required type="email"/></label><label>Date of birth<input name="dateOfBirth" type="date"/></label><label>Gender<select name="gender"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></label><label>Domicile district<input name="domicileDistrict" required/></label><label>Province<input name="province"/></label><label className="full">Residential address<textarea name="residentialAddress" required rows={3}/></label></div><h2>Program preferences</h2><p className="form-help">Choose up to 3. Click in your preferred order.</p><div className="program-options">{offerings.map(o=>{const i=programs.indexOf(o.id);return <button type="button" className={i>=0?"program-option selected":"program-option"} key={o.id} onClick={()=>setPrograms(p=>i>=0?p.filter(x=>x!==o.id):p.length<3?[...p,o.id]:p)}><span>{i>=0?i+1:"+"}</span>{o.program.name}</button>})}</div>{error&&<div className="error-box">{error}</div>}<button className="submit-application" disabled={busy||programs.length===0}>{busy?"Submitting securely…":"Submit application"}</button><small>By submitting, you confirm the information provided is accurate.</small></form></section></main>}
+import { useEffect, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
+import { api, ApiError } from "../lib/api";
+
+type SubmitResult = {
+  applicationNo: string;
+  emailSent: boolean;
+  temporaryPassword?: string;
+  message: string;
+};
+
+type FieldKey = "applicantName" | "fatherName" | "cnicBform" | "email";
+
+function firstFieldError(errors: Record<string, string[]>, key: FieldKey) {
+  return errors[key]?.[0] ?? "";
+}
+
+export function PublicApplyPage() {
+  const [error, setError] = useState("");
+  const [errorCode, setErrorCode] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+  const [result, setResult] = useState<SubmitResult | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (result) {
+      window.scrollTo({ top: 0 });
+    }
+  }, [result]);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setErrorCode("");
+    setFieldErrors({});
+    const form = new FormData(event.currentTarget);
+    try {
+      const data = await api<SubmitResult>("/v1/applications/public/submit", {
+        method: "POST",
+        body: JSON.stringify({
+          applicantName: String(form.get("applicantName") ?? "").trim(),
+          fatherName: String(form.get("fatherName") ?? "").trim(),
+          cnicBform: String(form.get("cnicBform") ?? "").trim(),
+          email: String(form.get("email") ?? "").trim(),
+        }),
+      });
+      setResult(data);
+    } catch (caught) {
+      if (caught instanceof ApiError) {
+        setError(caught.message);
+        setErrorCode(caught.code);
+        setFieldErrors(caught.fieldErrors);
+      } else {
+        setError(caught instanceof Error ? caught.message : "Could not start the application");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const showSignInHint = errorCode === "EMAIL_TAKEN" || errorCode === "DUPLICATE_APPLICATION";
+
+  return (
+    <div className="portal">
+      <header className="portal-header">
+        <div className="portal-brand">
+          <img className="usms-logo" src="/usms-logo.png" alt="University of Sufism and Modern Sciences" />
+          <div>
+            <strong>Admissions Portal</strong>
+            <small>University Admission System</small>
+          </div>
+        </div>
+        <Link className="portal-login" to="/login">
+          Applicant login
+        </Link>
+      </header>
+
+      <main className="portal-main">
+        {result ? (
+          <section className="portal-card portal-success">
+            <div className="portal-success-mark" aria-hidden="true">
+              <span className="ms">check_circle</span>
+            </div>
+            <p className="eyebrow">File opened</p>
+            <h1>Check your email, then sign in</h1>
+            <p className="portal-lede">
+              {result.emailSent
+                ? "We sent your application number and a temporary password. After you sign in, the application steps open."
+                : "Email is not configured on this server, so the temporary password is shown once here."}
+            </p>
+            <div className="credential-box">
+              <span>Application number</span>
+              <strong>{result.applicationNo}</strong>
+              {result.emailSent ? (
+                <>
+                  <span>Next step</span>
+                  <strong>Open the email, then sign in</strong>
+                </>
+              ) : (
+                <>
+                  <span>Temporary password</span>
+                  <strong>{result.temporaryPassword}</strong>
+                </>
+              )}
+            </div>
+            <Link className="portal-submit" to="/login">
+              Sign in and continue
+            </Link>
+          </section>
+        ) : (
+          <section className="portal-card">
+            <div className="portal-card-head">
+              <div>
+                <p className="eyebrow">Start here</p>
+                <h1>Open your admission file</h1>
+                <p className="portal-lede">
+                  Enter the name, father’s name, CNIC or B-Form, and email exactly as you will use them later. The rest of the form opens after you sign in.
+                </p>
+              </div>
+              <span className="portal-pill">
+                <span className="ms">badge</span>
+                Identity only
+              </span>
+            </div>
+            <form className="portal-form" onSubmit={submit} noValidate>
+              <div className="portal-grid">
+                <label className={firstFieldError(fieldErrors, "applicantName") ? "is-invalid" : undefined}>
+                  Full applicant name *
+                  <input name="applicantName" required minLength={3} autoComplete="name" aria-invalid={Boolean(firstFieldError(fieldErrors, "applicantName"))} />
+                  {firstFieldError(fieldErrors, "applicantName") ? (
+                    <small className="portal-field-error">{firstFieldError(fieldErrors, "applicantName")}</small>
+                  ) : null}
+                </label>
+                <label className={firstFieldError(fieldErrors, "fatherName") ? "is-invalid" : undefined}>
+                  Father / guardian name *
+                  <input name="fatherName" required minLength={3} aria-invalid={Boolean(firstFieldError(fieldErrors, "fatherName"))} />
+                  {firstFieldError(fieldErrors, "fatherName") ? (
+                    <small className="portal-field-error">{firstFieldError(fieldErrors, "fatherName")}</small>
+                  ) : null}
+                </label>
+                <label className={firstFieldError(fieldErrors, "cnicBform") ? "is-invalid" : undefined}>
+                  CNIC / B-Form number *
+                  <input
+                    name="cnicBform"
+                    required
+                    inputMode="numeric"
+                    autoComplete="off"
+                    placeholder="42101-7890123-5"
+                    aria-invalid={Boolean(firstFieldError(fieldErrors, "cnicBform"))}
+                  />
+                  {firstFieldError(fieldErrors, "cnicBform") ? (
+                    <small className="portal-field-error">{firstFieldError(fieldErrors, "cnicBform")}</small>
+                  ) : (
+                    <small className="portal-field-hint">13 digits. Dashes are optional.</small>
+                  )}
+                </label>
+                <label className={firstFieldError(fieldErrors, "email") ? "is-invalid" : undefined}>
+                  Email address *
+                  <input name="email" required type="email" autoComplete="email" aria-invalid={Boolean(firstFieldError(fieldErrors, "email"))} />
+                  {firstFieldError(fieldErrors, "email") ? (
+                    <small className="portal-field-error">{firstFieldError(fieldErrors, "email")}</small>
+                  ) : null}
+                </label>
+              </div>
+              {error ? (
+                <div className="error-box">
+                  <p>{error}</p>
+                  {showSignInHint ? (
+                    <p>
+                      Already registered? <Link to="/login">Sign in here</Link>.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+              <button className="portal-submit" type="submit" disabled={busy}>
+                {busy ? "Opening your file…" : "Continue and email my login"}
+              </button>
+              <small>A temporary password is sent to this email. Sign in next to complete the application.</small>
+            </form>
+          </section>
+        )}
+      </main>
+    </div>
+  );
+}

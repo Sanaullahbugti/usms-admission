@@ -6,7 +6,7 @@ Implement the USMS Admission Management System with simple, explicit code that j
 ## Rules
 - Read ARCHITECTURE.md before substantial work.
 - Frontend: React + TypeScript + Vite. Never Next.js.
-- Backend: Node + TypeScript + Express + Prisma + PostgreSQL.
+- Backend: Node + TypeScript + Express + Prisma + MariaDB/MySQL.
 - One React app for applicant and admin.
 - REST, not GraphQL.
 - Do not add Supabase/Firebase.

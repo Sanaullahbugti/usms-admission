@@ -2,7 +2,15 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "./AuthProvider";
 import { hasRole, type RoleName } from "../types/auth";
 
-export function RequireRole({ roles, children }: { roles: RoleName[]; children: React.ReactNode }) {
+export function RequireRole({
+  roles,
+  children,
+  loginPath = "/login",
+}: {
+  roles: RoleName[];
+  children: React.ReactNode;
+  loginPath?: string;
+}) {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
@@ -10,7 +18,7 @@ export function RequireRole({ roles, children }: { roles: RoleName[]; children: 
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={loginPath} replace />;
   }
 
   if (!hasRole(user, ...roles)) {

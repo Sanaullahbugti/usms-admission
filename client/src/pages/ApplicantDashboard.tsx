@@ -18,6 +18,8 @@ export function ApplicantDashboard() {
   }
 
   const data = dashboard.data;
+  const canContinue =
+    data.status === "DRAFT" || data.status === "CHANGE_REQUESTED" || Boolean(data.changeRequest);
 
   return (
     <>
@@ -29,6 +31,24 @@ export function ApplicantDashboard() {
         </div>
         <StatusBadge status={data.status} />
       </div>
+      {data.changeRequest ? (
+        <div className="action-banner">
+          <strong>
+            Action required · {data.changeRequest.items.length} item{data.changeRequest.items.length === 1 ? "" : "s"}
+          </strong>
+          <ul className="change-request-list">
+            {data.changeRequest.items.map((item) => (
+              <li key={item.id}>
+                <em>{item.targetLabel}</em>
+                <span>{item.message}</span>
+              </li>
+            ))}
+          </ul>
+          <Link to="/application">
+            <button type="button">Update and resubmit</button>
+          </Link>
+        </div>
+      ) : null}
       <div className="card-grid">
         <div className="card">
           <span>Status</span>
@@ -43,7 +63,7 @@ export function ApplicantDashboard() {
         </div>
         <div className="card">
           <span>Next step</span>
-          <strong>{data.pendingSections[0] ?? "Ready to review"}</strong>
+          <strong>{data.pendingSections[0] ?? (data.status === "SUBMITTED" ? "Awaiting review" : "Ready to review")}</strong>
         </div>
       </div>
       <div className="two-column">
@@ -58,11 +78,13 @@ export function ApplicantDashboard() {
           {data.pendingSections.map((item) => (
             <p key={item}>{item}</p>
           ))}
-          <div className="actions">
-            <Link to="/admission/apply">
-              <button type="button">Continue application</button>
-            </Link>
-          </div>
+          {canContinue ? (
+            <div className="actions">
+              <Link to="/application">
+                <button type="button">Continue application</button>
+              </Link>
+            </div>
+          ) : null}
         </section>
       </div>
     </>

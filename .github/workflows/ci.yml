@@ -7,18 +7,19 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     services:
-      postgres:
-        image: postgres:17-alpine
+      mysql:
+        image: mariadb:10.11
         env:
-          POSTGRES_USER: usms
-          POSTGRES_PASSWORD: usms
-          POSTGRES_DB: usms_admission
-        ports: ["5432:5432"]
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: usms_admission
+          MYSQL_USER: usms
+          MYSQL_PASSWORD: usms
+        ports: ["3306:3306"]
         options: >-
-          --health-cmd "pg_isready -U usms -d usms_admission"
-          --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s --health-timeout 5s --health-retries 20
     env:
-      DATABASE_URL: postgresql://usms:usms@localhost:5432/usms_admission?schema=public
+      DATABASE_URL: mysql://usms:usms@127.0.0.1:3306/usms_admission
       JWT_SECRET: ci-only-secret-value-with-more-than-32-characters
       CLIENT_ORIGIN: http://localhost:5173
       COOKIE_SECURE: "false"
@@ -30,7 +31,7 @@ jobs:
           cache: npm
       - run: npm install
       - run: npm run db:generate
-      - run: npm exec --workspace server prisma migrate dev --name iteration_2 --create-only
+      - run: npm exec --workspace server prisma migrate deploy
       - run: npm run db:seed
         env:
           SEED_ADMIN_PASSWORD: ci-development-password-only

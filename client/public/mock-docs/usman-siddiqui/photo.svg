@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="540" viewBox="0 0 420 540">
+  <rect width="420" height="540" fill="#f8fafc"/>
+  <rect x="24" y="24" width="372" height="492" rx="12" fill="#fff" stroke="#1d4ed8" stroke-width="3"/>
+  <rect x="24" y="24" width="372" height="72" fill="#1d4ed8"/>
+  <text x="210" y="68" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="20" font-weight="700">Passport Photo</text>
+  <text x="210" y="160" text-anchor="middle" fill="#0d1c2e" font-family="Arial,sans-serif" font-size="16" font-weight="600">Usman Siddiqui</text>
+  <circle cx="210" cy="280" r="70" fill="none" stroke="#1d4ed8" stroke-width="6"/>
+  <text x="210" y="288" text-anchor="middle" fill="#1d4ed8" font-family="Arial,sans-serif" font-size="18" font-weight="700">USMS</text>
+  <text x="210" y="420" text-anchor="middle" fill="#44474e" font-family="Arial,sans-serif" font-size="13">Sample admission document</text>
+  <text x="210" y="450" text-anchor="middle" fill="#74777f" font-family="Arial,sans-serif" font-size="12">Local mock file for review</text>
+</svg>

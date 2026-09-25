@@ -46,6 +46,11 @@ async function main() {
     update: {},
     create: { name: "VICE_CHANCELLOR" },
   });
+  await prisma.role.upsert({
+    where: { name: "APPLICANT" },
+    update: {},
+    create: { name: "APPLICANT" },
+  });
 
   const permissions = await prisma.permission.findMany();
   for (const permission of permissions) {
