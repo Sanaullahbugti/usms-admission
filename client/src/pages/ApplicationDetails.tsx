@@ -2,12 +2,15 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DossierInspector } from "../components/DossierInspector";
+import { useAuth } from "../auth/AuthProvider";
+import { hasPermission } from "../types/auth";
 import { applicationService } from "../services/applicationService";
 import type { ChangeRequestItem } from "../types/application";
 
 export function ApplicationDetails() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [error, setError] = useState("");
   const application = useQuery({
     queryKey: ["admin-application", id],
@@ -80,6 +83,9 @@ export function ApplicationDetails() {
         onRequestChange={(items) => requestChange.mutate(items)}
         onApprove={(message) => approveApplication.mutate(message)}
         onReject={(message) => rejectApplication.mutate(message)}
+        canReview={hasPermission(user, "application:review")}
+        canApprove={hasPermission(user, "application:approve")}
+        canReject={hasPermission(user, "application:reject")}
       />
     </div>
   );
