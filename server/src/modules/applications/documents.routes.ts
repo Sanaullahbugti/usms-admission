@@ -410,7 +410,7 @@ documentsRouter.get("/me/documents/:docType/file", requireAuth, async (req: Auth
 documentsRouter.get(
   "/:id/documents/:docType/file",
   requireAuth,
-  requirePermission("application:view"),
+  requirePermission("document:view"),
   async (req: AuthRequest, res) => {
     await ensureDocumentTable();
     const applicationId = typeof req.params.id === "string" ? req.params.id : "";
