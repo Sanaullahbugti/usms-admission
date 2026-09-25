@@ -66,6 +66,9 @@ export function DossierInspector({
   error,
   onOpenFull,
   onClose,
+  canReview = true,
+  canApprove = true,
+  canReject = true,
 }: {
   file: ApplicationFile;
   onRequestChange: (items: ChangeRequestItem[]) => void;
@@ -75,6 +78,9 @@ export function DossierInspector({
   error: string;
   onOpenFull?: () => void;
   onClose?: () => void;
+  canReview?: boolean;
+  canApprove?: boolean;
+  canReject?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("Documents");
   const [drafts, setDrafts] = useState<DraftComment[]>([]);
@@ -121,6 +127,10 @@ export function DossierInspector({
   const selected = file.documents.find((item) => item.id === documentId) ?? file.documents[0];
 
   function openComposer(kind: ChangeTargetKind, key: string, label: string, preferredTab?: Tab) {
+    if (!canReview) {
+      setNotice("Your role can view this dossier but cannot request changes.");
+      return;
+    }
     if (closed) {
       setNotice("This application is already closed. No further review actions are allowed.");
       return;
@@ -507,26 +517,30 @@ export function DossierInspector({
         </div>
       ) : null}
 
-      <footer className="cc-actions">
-        <button className="cc-btn cc-btn--ghost-danger" type="button" disabled={pending || closed} onClick={sendReject}>
-          <span className="ms">block</span>
-          Reject
-        </button>
-        <div>
-          <button className="cc-btn cc-btn--amber" type="button" disabled={pending || closed} onClick={submitChangeRequest}>
-            <span className="ms">rule_folder</span>
-            {pending
-              ? "Saving..."
-              : drafts.length > 0
-                ? `Submit change request (${drafts.length})`
-                : "Submit change request"}
-          </button>
-          <button className="cc-btn cc-btn--approve" type="button" disabled={pending || closed} onClick={sendApprove}>
-            <span className="ms">task_alt</span>
-            Approve
-          </button>
-        </div>
-      </footer>
+      {(canReview || canApprove || canReject) ? (
+        <footer className="cc-actions">
+          {canReject ? (
+            <button className="cc-btn cc-btn--ghost-danger" type="button" disabled={pending || closed} onClick={sendReject}>
+              <span className="ms">block</span>
+              Reject
+            </button>
+          ) : <span />}
+          <div>
+            {canReview ? (
+              <button className="cc-btn cc-btn--amber" type="button" disabled={pending || closed} onClick={submitChangeRequest}>
+                <span className="ms">rule_folder</span>
+                {pending ? "Saving..." : drafts.length > 0 ? `Submit change request (${drafts.length})` : "Submit change request"}
+              </button>
+            ) : null}
+            {canApprove ? (
+              <button className="cc-btn cc-btn--approve" type="button" disabled={pending || closed} onClick={sendApprove}>
+                <span className="ms">task_alt</span>
+                Approve
+              </button>
+            ) : null}
+          </div>
+        </footer>
+      ) : null}
     </section>
   );
 }
