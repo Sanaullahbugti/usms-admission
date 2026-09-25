@@ -12,7 +12,7 @@ import type {
 export const applicantDashboard: ApplicantDashboardData = {
   applicantName: "Muhammad Ali",
   applicationNo: "APP-2026-08192",
-  admissionCycle: "Undergraduate 2026-2027",
+  admissionCycle: "Undergraduate Admissions 2027",
   status: "CHANGE_REQUESTED",
   completionPercentage: 37,
   completedSections: ["Personal Info", "Program Choices"],
@@ -46,9 +46,9 @@ export const programs: ProgramOption[] = [
 ];
 
 export const vcDashboard: VcDashboardData = {
-  cycleName: "Undergraduate 2026-2027",
+  cycleName: "Undergraduate 2027",
   phase: "1st Merit Ratification",
-  ordinance: "CYCLE 2026-27",
+  ordinance: "CYCLE 2027",
   sessionLabel: "VICE CHANCELLOR BRIEFING",
   demandYield: { applications: 1842, seats: 2100, capacityPercent: 87.7 },
   eligiblePool: { qualified: 1489, ratePercent: 80.8 },

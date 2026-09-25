@@ -72,7 +72,7 @@ export function VcDashboard() {
             <h2>Decree of Merit List Ratification</h2>
             <p>
               Be it known to all statutory colleges, faculties, and constituent institutes: The Vice Chancellor in Syndicate,
-              having reviewed the authenticated rolls of Undergraduate Admissions for the Academic Year 2025–2026, hereby
+              having reviewed the authenticated rolls of Undergraduate Admissions for the Academic Year 2027, hereby
               places this provisional merit instrument before the high chamber for formal promulgation.
             </p>
           </div>

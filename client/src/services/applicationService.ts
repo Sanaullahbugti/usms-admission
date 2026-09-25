@@ -1,4 +1,5 @@
 import { api, ApiError } from "../lib/api";
+import { APPLICATION_STATUS } from "../constants/applicationStatus";
 import { applicantDashboard, programs, vcDashboard } from "../data/mockApplications";
 import type {
   ApplicantDashboardData,
@@ -30,12 +31,13 @@ const DOC_TITLES: Record<string, string> = {
 };
 
 export type ApiEducationRow = {
-  level: "SSC" | "HSC" | string;
+  level: "SSC" | "HSC" | "DIPLOMA" | "DEGREE" | "EXTRA1" | "EXTRA2" | "EXTRA3" | string;
   group: string | null;
   board: string | null;
   year: string | null;
   obtainedMarks: string | null;
   totalMarks: string | null;
+  cgpa?: string | null;
   rollNumber: string | null;
   institutionType: string | null;
 };
@@ -50,6 +52,7 @@ export type ApiMyApplication = {
   profile: {
     applicantName: string;
     fatherName: string;
+    surname?: string | null;
     cnicBform: string | null;
     email: string | null;
     mobile: string | null;
@@ -105,6 +108,7 @@ type ApiAdminApplication = ApiMyApplication & {
 };
 
 export type DraftPayload = {
+  surname?: string | null;
   mobile?: string | null;
   dateOfBirth?: string | null;
   gender?: string | null;
@@ -122,12 +126,13 @@ export type DraftPayload = {
   siblingRegNo?: string | null;
   programOfferingIds?: string[];
   education?: Array<{
-    level: "SSC" | "HSC";
+    level: "SSC" | "HSC" | "DIPLOMA" | "DEGREE" | "EXTRA1" | "EXTRA2" | "EXTRA3";
     group?: string | null;
     board?: string | null;
     year?: string | null;
     obtainedMarks?: string | null;
     totalMarks?: string | null;
+    cgpa?: string | null;
     rollNumber?: string | null;
     institutionType?: string | null;
   }>;
@@ -290,7 +295,7 @@ async function postReview(id: string, action: "REQUEST_CHANGES" | "APPROVE" | "R
 function fromApiApplication(app: ApiMyApplication): ApplicantDashboardData {
   const changeReview = app.reviews.find((review) => review.action === "REQUEST_CHANGES");
   const changeRequest =
-    app.status === "CHANGE_REQUESTED" && changeReview
+    app.status === APPLICATION_STATUS.CHANGE_REQUESTED && changeReview
       ? {
           section: "Application",
           message: changeReview.message ?? "Please correct the application and resubmit.",
@@ -314,7 +319,7 @@ function fromApiApplication(app: ApiMyApplication): ApplicantDashboardData {
     applicationNo: app.applicationNo ?? "",
     admissionCycle: app.admissionCycle.name,
     status: app.status,
-    completionPercentage: app.status === "DRAFT" ? 40 : 100,
+    completionPercentage: app.status === APPLICATION_STATUS.DRAFT ? 40 : 100,
     completedSections: ["Personal Info", "Program Choices"],
     pendingSections: changeRequest ? ["Corrections required"] : [],
     changeRequest,
@@ -331,9 +336,13 @@ export function mapApplicationToWizardForm(app: ApiMyApplication) {
   const byOrder = [...app.programChoices].sort((a, b) => a.preferenceOrder - b.preferenceOrder);
   const ssc = app.education.find((row) => row.level === "SSC");
   const hsc = app.education.find((row) => row.level === "HSC");
+  const extras = app.education
+    .filter((row) => ["DIPLOMA", "DEGREE", "EXTRA1", "EXTRA2", "EXTRA3"].includes(row.level))
+    .sort((a, b) => a.level.localeCompare(b.level));
   return {
     applicantName: profile?.applicantName ?? "",
     fatherName: profile?.fatherName ?? "",
+    surname: profile?.surname ?? "",
     cnicBform: profile?.cnicBform ?? "",
     dateOfBirth: toDateInput(profile?.dateOfBirth),
     gender: profile?.gender ?? "",
@@ -343,9 +352,7 @@ export function mapApplicationToWizardForm(app: ApiMyApplication) {
     province: profile?.province ?? "",
     nationality: profile?.nationality ?? "Pakistani",
     postalAddress: profile?.postalAddress ?? "",
-    firstChoice: byOrder[0]?.programOfferingId ?? "",
-    secondChoice: byOrder[1]?.programOfferingId ?? "",
-    thirdChoice: byOrder[2]?.programOfferingId ?? "",
+    programChoices: Array.from({ length: 10 }, (_, index) => byOrder[index]?.programOfferingId ?? ""),
     sscGroup: ssc?.group ?? "",
     sscBoard: ssc?.board ?? "",
     sscYear: ssc?.year ?? "",
@@ -366,6 +373,19 @@ export function mapApplicationToWizardForm(app: ApiMyApplication) {
     hasSibling: Boolean(profile?.hasSibling),
     siblingName: profile?.siblingName ?? "",
     siblingRegNo: profile?.siblingRegNo ?? "",
+    extraQuals: extras.map((row, index) => ({
+      id: index + 1,
+      kind: (row.group === "Degree" || row.level === "DEGREE" ? "Degree" : row.group === "Other" ? "Other" : "Diploma") as
+        | "Diploma"
+        | "Degree"
+        | "Other",
+      title: row.institutionType || row.group || "",
+      institute: row.board ?? "",
+      year: row.year ?? "",
+      grading: row.cgpa ? ("cgpa" as const) : ("marks" as const),
+      marks: row.obtainedMarks && row.totalMarks ? `${row.obtainedMarks}/${row.totalMarks}` : row.obtainedMarks ?? "",
+      cgpa: row.cgpa ?? "",
+    })),
   };
 }
 
@@ -382,7 +402,7 @@ function syncApplicantNotice(file: ApplicationFile) {
     return;
   }
   applicantDashboard.status = file.status;
-  if (file.status === "CHANGE_REQUESTED") {
+  if (file.status === APPLICATION_STATUS.CHANGE_REQUESTED) {
     const latest = file.reviews.find((note) => note.action === "CHANGE_REQUESTED");
     const items = latest?.items?.length
       ? latest.items.map((item) => ({ ...item }))

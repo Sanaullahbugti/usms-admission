@@ -209,7 +209,7 @@ export function VcLayout() {
           </div>
         </div>
         <div className="vc-footer-meta">
-          <span>STATUTORY YEAR: 2025–2026</span>
+          <span>STATUTORY YEAR: 2027</span>
           <span>·</span>
           <span>GAZETTE REGISTRY: PK-SN-JAM-004</span>
           <span>·</span>

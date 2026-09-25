@@ -1,12 +1,6 @@
-export type ApplicationStatus =
-  | "DRAFT"
-  | "SUBMITTED"
-  | "UNDER_REVIEW"
-  | "CHANGE_REQUESTED"
-  | "RESUBMITTED"
-  | "DOCUMENTS_VERIFIED"
-  | "APPROVED"
-  | "REJECTED";
+import type { ApplicationStatus } from "../constants/applicationStatus";
+
+export type { ApplicationStatus };
 
 export type PaymentStatus = "PENDING" | "SUBMITTED" | "VERIFIED" | "REJECTED";
 

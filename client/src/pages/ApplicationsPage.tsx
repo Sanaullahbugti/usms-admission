@@ -2,6 +2,10 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { StatusBadge } from "../components/StatusBadge";
+import {
+  ADMIN_FILTER_STATUSES,
+  APPLICATION_STATUS_LABEL,
+} from "../constants/applicationStatus";
 import { applicationService } from "../services/applicationService";
 import type { ApplicationStatus, PaymentStatus } from "../types/application";
 
@@ -48,11 +52,11 @@ export function ApplicationsPage() {
           Status
           <select value={status} onChange={(event) => setStatus(event.target.value as ApplicationStatus | "ALL")}>
             <option value="ALL">All statuses</option>
-            <option value="SUBMITTED">Submitted</option>
-            <option value="UNDER_REVIEW">Under review</option>
-            <option value="CHANGE_REQUESTED">Change requested</option>
-            <option value="APPROVED">Approved</option>
-            <option value="REJECTED">Rejected</option>
+            {ADMIN_FILTER_STATUSES.map((value) => (
+              <option key={value} value={value}>
+                {APPLICATION_STATUS_LABEL[value]}
+              </option>
+            ))}
           </select>
         </label>
         <span className="cc-count">Showing {rows.length}</span>

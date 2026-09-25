@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { StatusBadge } from "../components/StatusBadge";
+import { APPLICATION_STATUS, isEditableStatus } from "../constants/applicationStatus";
 import { applicationService } from "../services/applicationService";
 
 export function ApplicantDashboard() {
@@ -18,8 +19,7 @@ export function ApplicantDashboard() {
   }
 
   const data = dashboard.data;
-  const canContinue =
-    data.status === "DRAFT" || data.status === "CHANGE_REQUESTED" || Boolean(data.changeRequest);
+  const canContinue = isEditableStatus(data.status) || Boolean(data.changeRequest);
 
   return (
     <>
@@ -63,7 +63,7 @@ export function ApplicantDashboard() {
         </div>
         <div className="card">
           <span>Next step</span>
-          <strong>{data.pendingSections[0] ?? (data.status === "SUBMITTED" ? "Awaiting review" : "Ready to review")}</strong>
+          <strong>{data.pendingSections[0] ?? (data.status === APPLICATION_STATUS.SUBMITTED ? "Awaiting review" : "Ready to review")}</strong>
         </div>
       </div>
       <div className="two-column">

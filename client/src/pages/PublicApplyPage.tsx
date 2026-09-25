@@ -9,7 +9,7 @@ type SubmitResult = {
   message: string;
 };
 
-type FieldKey = "applicantName" | "fatherName" | "cnicBform" | "email";
+type FieldKey = "applicantName" | "fatherName" | "surname" | "cnicBform" | "email";
 
 function firstFieldError(errors: Record<string, string[]>, key: FieldKey) {
   return errors[key]?.[0] ?? "";
@@ -41,6 +41,7 @@ export function PublicApplyPage() {
         body: JSON.stringify({
           applicantName: String(form.get("applicantName") ?? "").trim(),
           fatherName: String(form.get("fatherName") ?? "").trim(),
+          surname: String(form.get("surname") ?? "").trim(),
           cnicBform: String(form.get("cnicBform") ?? "").trim(),
           email: String(form.get("email") ?? "").trim(),
         }),
@@ -111,36 +112,56 @@ export function PublicApplyPage() {
         ) : (
           <section className="portal-card">
             <div className="portal-card-head">
-              <div>
-                <p className="eyebrow">Start here</p>
+              <div className="portal-card-copy">
+                <div className="portal-card-kicker">
+                  <p className="eyebrow">Start here</p>
+                  <span className="portal-pill">
+                    <span className="ms">badge</span>
+                    Identity only
+                  </span>
+                </div>
                 <h1>Open your admission file</h1>
                 <p className="portal-lede">
-                  Enter the name, father’s name, CNIC or B-Form, and email exactly as you will use them later. The rest of the form opens after you sign in.
+                  Enter the name, father’s name, surname, CNIC or B-Form, and email exactly as you will use them later. The rest of the form opens after you sign in.
                 </p>
+                <p className="portal-note">Write your name exactly as it appears on your matriculation documents.</p>
               </div>
-              <span className="portal-pill">
-                <span className="ms">badge</span>
-                Identity only
-              </span>
             </div>
             <form className="portal-form" onSubmit={submit} noValidate>
               <div className="portal-grid">
                 <label className={firstFieldError(fieldErrors, "applicantName") ? "is-invalid" : undefined}>
-                  Full applicant name *
+                  <span className="portal-label-text">Full applicant name *</span>
                   <input name="applicantName" required minLength={3} autoComplete="name" aria-invalid={Boolean(firstFieldError(fieldErrors, "applicantName"))} />
-                  {firstFieldError(fieldErrors, "applicantName") ? (
-                    <small className="portal-field-error">{firstFieldError(fieldErrors, "applicantName")}</small>
-                  ) : null}
+                  <span className="portal-field-meta">
+                    {firstFieldError(fieldErrors, "applicantName") ? (
+                      <small className="portal-field-error">{firstFieldError(fieldErrors, "applicantName")}</small>
+                    ) : (
+                      <small className="portal-field-hint">As on matriculation certificate</small>
+                    )}
+                  </span>
                 </label>
                 <label className={firstFieldError(fieldErrors, "fatherName") ? "is-invalid" : undefined}>
-                  Father / guardian name *
+                  <span className="portal-label-text">Father / guardian name *</span>
                   <input name="fatherName" required minLength={3} aria-invalid={Boolean(firstFieldError(fieldErrors, "fatherName"))} />
-                  {firstFieldError(fieldErrors, "fatherName") ? (
-                    <small className="portal-field-error">{firstFieldError(fieldErrors, "fatherName")}</small>
-                  ) : null}
+                  <span className="portal-field-meta">
+                    {firstFieldError(fieldErrors, "fatherName") ? (
+                      <small className="portal-field-error">{firstFieldError(fieldErrors, "fatherName")}</small>
+                    ) : null}
+                  </span>
+                </label>
+                <label className={firstFieldError(fieldErrors, "surname") ? "is-invalid" : undefined}>
+                  <span className="portal-label-text">Surname / caste</span>
+                  <input name="surname" maxLength={120} autoComplete="family-name" aria-invalid={Boolean(firstFieldError(fieldErrors, "surname"))} />
+                  <span className="portal-field-meta">
+                    {firstFieldError(fieldErrors, "surname") ? (
+                      <small className="portal-field-error">{firstFieldError(fieldErrors, "surname")}</small>
+                    ) : (
+                      <small className="portal-field-hint">Optional if already in full name</small>
+                    )}
+                  </span>
                 </label>
                 <label className={firstFieldError(fieldErrors, "cnicBform") ? "is-invalid" : undefined}>
-                  CNIC / B-Form number *
+                  <span className="portal-label-text">CNIC / B-Form number *</span>
                   <input
                     name="cnicBform"
                     required
@@ -149,18 +170,24 @@ export function PublicApplyPage() {
                     placeholder="42101-7890123-5"
                     aria-invalid={Boolean(firstFieldError(fieldErrors, "cnicBform"))}
                   />
-                  {firstFieldError(fieldErrors, "cnicBform") ? (
-                    <small className="portal-field-error">{firstFieldError(fieldErrors, "cnicBform")}</small>
-                  ) : (
-                    <small className="portal-field-hint">13 digits. Dashes are optional.</small>
-                  )}
+                  <span className="portal-field-meta">
+                    {firstFieldError(fieldErrors, "cnicBform") ? (
+                      <small className="portal-field-error">{firstFieldError(fieldErrors, "cnicBform")}</small>
+                    ) : (
+                      <small className="portal-field-hint">13 digits. Dashes are optional.</small>
+                    )}
+                  </span>
                 </label>
                 <label className={firstFieldError(fieldErrors, "email") ? "is-invalid" : undefined}>
-                  Email address *
+                  <span className="portal-label-text">Email address *</span>
                   <input name="email" required type="email" autoComplete="email" aria-invalid={Boolean(firstFieldError(fieldErrors, "email"))} />
-                  {firstFieldError(fieldErrors, "email") ? (
-                    <small className="portal-field-error">{firstFieldError(fieldErrors, "email")}</small>
-                  ) : null}
+                  <span className="portal-field-meta">
+                    {firstFieldError(fieldErrors, "email") ? (
+                      <small className="portal-field-error">{firstFieldError(fieldErrors, "email")}</small>
+                    ) : (
+                      <small className="portal-field-hint">Use an email you can open now</small>
+                    )}
+                  </span>
                 </label>
               </div>
               {error ? (

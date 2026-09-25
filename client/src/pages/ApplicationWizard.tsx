@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { downloadMcbChallan, MCB_CHALLAN, nextChallanNo, splitSurname } from "../lib/mcbChallan";
+import { downloadMcbChallan, MCB_CHALLAN, nextChallanNo } from "../lib/mcbChallan";
 import { ApiError, documentFileUrl } from "../lib/api";
 import {
   applicationService,
@@ -8,6 +8,7 @@ import {
   type ApplicantDocument,
   type DraftPayload,
 } from "../services/applicationService";
+import { APPLICATION_STATUS, isPostSubmitViewStatus } from "../constants/applicationStatus";
 import type { ProgramOption } from "../types/application";
 
 const steps = [
@@ -29,20 +30,34 @@ const documents = [
   { docType: "PHOTO" as const, title: "Passport photograph", hint: "Recent photograph · JPG or PNG · max 5 MB" },
 ];
 
-const choiceKeys = ["firstChoice", "secondChoice", "thirdChoice"] as const;
-
-type ChoiceKey = (typeof choiceKeys)[number];
+const MAX_PROGRAM_CHOICES = 10;
 
 type ExtraQualification = {
   id: number;
+  kind: "Diploma" | "Degree" | "Other";
   title: string;
   institute: string;
+  year: string;
+  grading: "marks" | "cgpa";
   marks: string;
+  cgpa: string;
 };
 
 type Toast = { message: string; tone: "ok" | "info" | "error" };
 
 type ValidationIssue = { step: number; field: string; message: string };
+
+function ordinalLabel(index: number) {
+  const n = index + 1;
+  const mod100 = n % 100;
+  const mod10 = n % 10;
+  const suffix = mod100 >= 11 && mod100 <= 13 ? "th" : mod10 === 1 ? "st" : mod10 === 2 ? "nd" : mod10 === 3 ? "rd" : "th";
+  return `${n}${suffix}`;
+}
+
+function emptyProgramChoices() {
+  return Array.from({ length: MAX_PROGRAM_CHOICES }, () => "");
+}
 
 function ratio(obtained: string, total: string) {
   const got = Number(obtained);
@@ -144,6 +159,7 @@ export function ApplicationWizard() {
   const [form, setForm] = useState({
     applicantName: "",
     fatherName: "",
+    surname: "",
     cnicBform: "",
     dateOfBirth: "",
     gender: "",
@@ -153,9 +169,7 @@ export function ApplicationWizard() {
     province: "",
     nationality: "Pakistani",
     postalAddress: "",
-    firstChoice: "",
-    secondChoice: "",
-    thirdChoice: "",
+    programChoices: emptyProgramChoices(),
     sscGroup: "",
     sscBoard: "",
     sscYear: "",
@@ -194,21 +208,26 @@ export function ApplicationWizard() {
     }
     identityReady.current = true;
     const mapped = mapApplicationToWizardForm(app);
+    const { extraQuals: hydratedExtras, ...profileFields } = mapped;
     setForm((current) => ({
       ...current,
-      ...mapped,
+      ...profileFields,
       // Keep challan/declaration UI-only fields
       challanBank: current.challanBank,
-      challanSlip: current.challanSlip,
+      challanSlip: current.challanSlip || app.applicationNo || "",
       challanDate: current.challanDate,
       declareTrue: current.declareTrue,
       declareRules: current.declareRules,
       declareCertificate: current.declareCertificate,
       declarationName: current.declarationName,
     }));
-    if (app.status === "SUBMITTED" || app.status === "UNDER_REVIEW" || app.status === "APPROVED") {
+    if (hydratedExtras.length > 0) {
+      setExtraQuals(hydratedExtras);
+      setNextQualId(hydratedExtras.reduce((max, row) => Math.max(max, row.id), 0) + 1);
+    }
+    if (isPostSubmitViewStatus(app.status)) {
       setSubmitted(true);
-      setSubmittedAsResubmit(app.status === "UNDER_REVIEW" && Boolean(app.submittedAt));
+      setSubmittedAsResubmit(app.status === APPLICATION_STATUS.UNDER_REVIEW && Boolean(app.submittedAt));
     }
   }, [myApplication.data]);
 
@@ -266,6 +285,16 @@ export function ApplicationWizard() {
     setSubmitIssues((current) => current.filter((issue) => issue.field !== String(name)));
   }
 
+  function updateProgramChoice(index: number, value: string) {
+    setForm((current) => {
+      const programChoices = [...current.programChoices];
+      programChoices[index] = value;
+      return { ...current, programChoices };
+    });
+    setSaved(false);
+    setSubmitIssues((current) => current.filter((issue) => issue.field !== "programChoices"));
+  }
+
   function collectSubmitIssues(): ValidationIssue[] {
     const issues: ValidationIssue[] = [];
     if (!form.dateOfBirth.trim()) issues.push({ step: 1, field: "dateOfBirth", message: "Date of birth is required." });
@@ -273,7 +302,9 @@ export function ApplicationWizard() {
     if (!form.mobile.trim()) issues.push({ step: 1, field: "mobile", message: "Mobile phone is required." });
     if (!form.domicileDistrict.trim()) issues.push({ step: 1, field: "domicileDistrict", message: "Domicile district is required." });
     if (!form.postalAddress.trim()) issues.push({ step: 1, field: "postalAddress", message: "Postal address is required." });
-    if (!form.firstChoice.trim()) issues.push({ step: 2, field: "firstChoice", message: "Select at least a first program preference." });
+    if (!form.programChoices.some((choice) => choice.trim())) {
+      issues.push({ step: 2, field: "programChoices", message: "Select at least a first program preference." });
+    }
 
     if (!form.sscBoard.trim() || !form.sscObtained.trim() || !form.sscTotal.trim()) {
       issues.push({ step: 3, field: "ssc", message: "Complete SSC board and marks." });
@@ -348,8 +379,34 @@ export function ApplicationWizard() {
   }
 
   function buildDraftPayload(): DraftPayload {
-    const programOfferingIds = [form.firstChoice, form.secondChoice, form.thirdChoice].filter(Boolean);
+    const programOfferingIds = form.programChoices.filter(Boolean).slice(0, MAX_PROGRAM_CHOICES);
+    const extraEducation = extraQuals.slice(0, 3).map((item, index) => {
+      const level = (`EXTRA${index + 1}` as "EXTRA1" | "EXTRA2" | "EXTRA3");
+      const useCgpa = (item.kind === "Diploma" || item.kind === "Degree") && item.grading === "cgpa";
+      let obtainedMarks: string | null = null;
+      let totalMarks: string | null = null;
+      if (!useCgpa && item.marks.trim()) {
+        const parts = item.marks.split("/").map((part) => part.trim());
+        if (parts.length === 2 && parts[0] && parts[1]) {
+          obtainedMarks = parts[0];
+          totalMarks = parts[1];
+        } else {
+          obtainedMarks = item.marks.trim();
+        }
+      }
+      return {
+        level,
+        group: item.kind,
+        board: item.institute || null,
+        year: item.year || null,
+        obtainedMarks,
+        totalMarks,
+        cgpa: useCgpa ? item.cgpa.trim() || null : null,
+        institutionType: item.title || null,
+      };
+    });
     return {
+      surname: form.surname || null,
       mobile: form.mobile || null,
       dateOfBirth: form.dateOfBirth || null,
       gender: form.gender || null,
@@ -385,6 +442,7 @@ export function ApplicationWizard() {
           rollNumber: form.hscRoll || null,
           institutionType: form.institutionType || null,
         },
+        ...extraEducation,
       ],
     };
   }
@@ -422,8 +480,7 @@ export function ApplicationWizard() {
 
   async function downloadChallan(isRedownload: boolean) {
     const applicationNo = dashboard.data?.applicationNo ?? "APP-DRAFT";
-    const { given, surname } = splitSurname(form.applicantName);
-    const challanNo = form.challanSlip.trim() || nextChallanNo(applicationNo);
+    const challanNo = nextChallanNo(applicationNo);
     const dateLabel = form.challanDate
       ? new Date(form.challanDate).toLocaleDateString("en-GB")
       : new Date().toLocaleDateString("en-GB");
@@ -432,9 +489,9 @@ export function ApplicationWizard() {
         applicationNo,
         challanNo,
         dateLabel,
-        name: given || form.applicantName,
+        name: form.applicantName,
         fatherName: form.fatherName,
-        surname,
+        surname: form.surname,
         cnic: form.cnicBform,
         program: "",
         mobile: form.mobile,
@@ -442,7 +499,7 @@ export function ApplicationWizard() {
       setForm((current) => ({
         ...current,
         challanBank: MCB_CHALLAN.bankName,
-        challanSlip: current.challanSlip.trim() || result.challanNo,
+        challanSlip: result.challanNo,
         challanDate: current.challanDate || new Date().toISOString().slice(0, 10),
       }));
       setChallanDownloaded(true);
@@ -546,14 +603,14 @@ export function ApplicationWizard() {
     },
     onSuccess: (result) => {
       setSubmitted(true);
-      setSubmittedAsResubmit(result.status === "UNDER_REVIEW");
+      setSubmittedAsResubmit(result.status === APPLICATION_STATUS.UNDER_REVIEW);
       setSaved(true);
       setSubmitIssues([]);
       void queryClient.invalidateQueries({ queryKey: ["applicant-dashboard"] });
       void queryClient.invalidateQueries({ queryKey: ["my-application"] });
       setToast({
         message:
-          result.status === "UNDER_REVIEW"
+          result.status === APPLICATION_STATUS.UNDER_REVIEW
             ? "Correction submitted. The application is back under review."
             : "Application submitted. Admissions will review your file.",
         tone: "ok",
@@ -580,7 +637,23 @@ export function ApplicationWizard() {
   }
 
   function addQualification() {
-    setExtraQuals((current) => [...current, { id: nextQualId, title: "", institute: "", marks: "" }]);
+    if (extraQuals.length >= 3) {
+      setToast({ message: "You can add up to three additional qualifications.", tone: "info" });
+      return;
+    }
+    setExtraQuals((current) => [
+      ...current,
+      {
+        id: nextQualId,
+        kind: "Diploma",
+        title: "",
+        institute: "",
+        year: "",
+        grading: "marks",
+        marks: "",
+        cgpa: "",
+      },
+    ]);
     setNextQualId((current) => current + 1);
     setToast({ message: "Additional qualification added to this draft.", tone: "info" });
   }
@@ -591,7 +664,7 @@ export function ApplicationWizard() {
   const nameOf = (code: string) => programLabel(programs.data, code);
   const draftDate = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
   const current = steps[step - 1];
-  const isResubmit = Boolean(changeRequest) || dashboard.data?.status === "CHANGE_REQUESTED";
+  const isResubmit = Boolean(changeRequest) || dashboard.data?.status === APPLICATION_STATUS.CHANGE_REQUESTED;
   const submitLabel = submitApplication.isPending
     ? "Submitting..."
     : isResubmit
@@ -691,10 +764,11 @@ export function ApplicationWizard() {
           {step === 1 ? (
             <StepCard
               title="Step 1: Personal profile"
-              lede="Enter identity details as they appear on the CNIC or B-Form."
+              lede="Enter identity details as they appear on your matriculation documents and CNIC or B-Form."
               badge="Identity"
               icon="badge"
             >
+              <p className="admit-note">Name should be as per matriculation documents.</p>
               <div className="admit-grid admit-grid-2">
                 <Field label="Full applicant name *">
                   <input value={form.applicantName} onChange={(event) => update("applicantName", event.target.value)} />
@@ -703,10 +777,15 @@ export function ApplicationWizard() {
                   <input value={form.fatherName} onChange={(event) => update("fatherName", event.target.value)} />
                 </Field>
               </div>
-              <div className="admit-grid admit-grid-3">
+              <div className="admit-grid admit-grid-2">
+                <Field label="Surname">
+                  <input value={form.surname} onChange={(event) => update("surname", event.target.value)} autoComplete="family-name" />
+                </Field>
                 <Field label="CNIC / B-Form number *">
                   <input value={form.cnicBform} onChange={(event) => update("cnicBform", event.target.value)} />
                 </Field>
+              </div>
+              <div className="admit-grid admit-grid-3">
                 <Field label="Date of birth *" error={fieldIssue("dateOfBirth")}>
                   <input type="date" value={form.dateOfBirth} onChange={(event) => update("dateOfBirth", event.target.value)} />
                 </Field>
@@ -717,6 +796,9 @@ export function ApplicationWizard() {
                     <option value="Female">Female</option>
                     <option value="Other">Other</option>
                   </select>
+                </Field>
+                <Field label="Nationality *">
+                  <input value={form.nationality} readOnly />
                 </Field>
               </div>
               <div className="admit-grid admit-grid-2">
@@ -731,8 +813,8 @@ export function ApplicationWizard() {
                 <Field label="Domicile district *" error={fieldIssue("domicileDistrict")}>
                   <input value={form.domicileDistrict} onChange={(event) => update("domicileDistrict", event.target.value)} />
                 </Field>
-                <Field label="Nationality *">
-                  <input value={form.nationality} readOnly />
+                <Field label="Province">
+                  <input value={form.province} onChange={(event) => update("province", event.target.value)} />
                 </Field>
               </div>
               <Field label="Postal / mailing address *" error={fieldIssue("postalAddress")}>
@@ -744,24 +826,24 @@ export function ApplicationWizard() {
           {step === 2 ? (
             <StepCard
               title="Step 2: Program choices"
-              lede="Select up to three programs. Merit uses this order."
-              badge="Max 3 choices"
+              lede="Select up to 10 BS program preferences. The same program may be chosen in more than one position."
+              badge="Max 10 choices"
               icon="tune"
             >
-              {choiceKeys.map((key, index) => (
-                <div className={index === 0 ? "admit-choice admit-choice--primary" : "admit-choice"} key={key}>
+              {fieldIssue("programChoices") ? <p className="admit-field-error">{fieldIssue("programChoices")}</p> : null}
+              {form.programChoices.map((choice, index) => (
+                <div className={index === 0 ? "admit-choice admit-choice--primary" : "admit-choice"} key={`choice-${index}`}>
                   <div className="admit-choice-head">
                     <strong>
                       <span className="admit-dot" />
-                      {index + 1}
-                      {index === 0 ? "st" : index === 1 ? "nd" : "rd"} priority
+                      {ordinalLabel(index)} priority
                     </strong>
-                    <span className="admit-pill">HSC {hscPercent}%</span>
+                    {index === 0 ? <span className="admit-pill">HSC {hscPercent}%</span> : null}
                   </div>
                   <ProgramSelect
                     programs={programs.data}
-                    value={form[key]}
-                    onChange={(value) => update(key, value)}
+                    value={choice}
+                    onChange={(value) => updateProgramChoice(index, value)}
                   />
                 </div>
               ))}
@@ -921,7 +1003,32 @@ export function ApplicationWizard() {
                     </button>
                   </header>
                   <div className="admit-grid admit-grid-3">
-                    <Field label="Degree / diploma title">
+                    <Field label="Type">
+                      <select
+                        value={item.kind}
+                        onChange={(event) =>
+                          setExtraQuals((current) =>
+                            current.map((row) =>
+                              row.id === item.id
+                                ? {
+                                    ...row,
+                                    kind: event.target.value as ExtraQualification["kind"],
+                                    grading:
+                                      event.target.value === "Diploma" || event.target.value === "Degree"
+                                        ? row.grading
+                                        : "marks",
+                                  }
+                                : row,
+                            ),
+                          )
+                        }
+                      >
+                        <option value="Diploma">Diploma</option>
+                        <option value="Degree">Degree</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </Field>
+                    <Field label="Title">
                       <input
                         value={item.title}
                         onChange={(event) =>
@@ -941,16 +1048,74 @@ export function ApplicationWizard() {
                         }
                       />
                     </Field>
-                    <Field label="Marks">
+                    <Field label="Passing year">
                       <input
-                        value={item.marks}
+                        value={item.year}
                         onChange={(event) =>
                           setExtraQuals((current) =>
-                            current.map((row) => (row.id === item.id ? { ...row, marks: event.target.value } : row)),
+                            current.map((row) => (row.id === item.id ? { ...row, year: event.target.value } : row)),
                           )
                         }
                       />
                     </Field>
+                    {item.kind === "Diploma" || item.kind === "Degree" ? (
+                      <Field label="Grading">
+                        <select
+                          value={item.grading}
+                          onChange={(event) =>
+                            setExtraQuals((current) =>
+                              current.map((row) =>
+                                row.id === item.id
+                                  ? { ...row, grading: event.target.value as ExtraQualification["grading"] }
+                                  : row,
+                              ),
+                            )
+                          }
+                        >
+                          <option value="marks">Marks</option>
+                          <option value="cgpa">CGPA</option>
+                        </select>
+                      </Field>
+                    ) : null}
+                    {item.kind === "Diploma" || item.kind === "Degree" ? (
+                      item.grading === "cgpa" ? (
+                        <Field label="CGPA">
+                          <input
+                            inputMode="decimal"
+                            placeholder="e.g. 3.45"
+                            value={item.cgpa}
+                            onChange={(event) =>
+                              setExtraQuals((current) =>
+                                current.map((row) => (row.id === item.id ? { ...row, cgpa: event.target.value } : row)),
+                              )
+                            }
+                          />
+                        </Field>
+                      ) : (
+                        <Field label="Marks (obtained/total)">
+                          <input
+                            placeholder="e.g. 780/1100"
+                            value={item.marks}
+                            onChange={(event) =>
+                              setExtraQuals((current) =>
+                                current.map((row) => (row.id === item.id ? { ...row, marks: event.target.value } : row)),
+                              )
+                            }
+                          />
+                        </Field>
+                      )
+                    ) : (
+                      <Field label="Marks / result">
+                        <input
+                          value={item.marks}
+                          onChange={(event) =>
+                            setExtraQuals((current) =>
+                              current.map((row) => (row.id === item.id ? { ...row, marks: event.target.value } : row)),
+                            )
+                          }
+                        />
+                      </Field>
+                    )}
                   </div>
                 </article>
               ))}
@@ -1120,12 +1285,15 @@ export function ApplicationWizard() {
                     </div>
                     <div>
                       <dt>Challan No.</dt>
-                      <dd>{form.challanSlip || "Assigned on first download"}</dd>
+                      <dd>{form.challanSlip || dashboard.data?.applicationNo || "Assigned on first download"}</dd>
                     </div>
                     <div>
                       <dt>Prefill from</dt>
                       <dd>
-                        {form.applicantName} · {nameOf(form.firstChoice)}
+                        {form.applicantName}
+                        {form.surname ? ` ${form.surname}` : ""}
+                        {" · "}
+                        {nameOf(form.programChoices[0] ?? "")}
                       </dd>
                     </div>
                   </dl>
@@ -1220,6 +1388,7 @@ export function ApplicationWizard() {
               <ReviewBlock title="1. Personal profile" icon="person" onEdit={() => goToStep(1)}>
                 <dl className="admit-review-grid">
                   <div><dt>Name</dt><dd>{form.applicantName}</dd></div>
+                  <div><dt>Surname</dt><dd>{form.surname || "—"}</dd></div>
                   <div><dt>Father</dt><dd>{form.fatherName}</dd></div>
                   <div><dt>CNIC</dt><dd>{form.cnicBform}</dd></div>
                   <div><dt>Domicile</dt><dd>{form.domicileDistrict}</dd></div>
@@ -1227,9 +1396,14 @@ export function ApplicationWizard() {
               </ReviewBlock>
               <ReviewBlock title="2. Program preferences" icon="fact_check" onEdit={() => goToStep(2)}>
                 <ol>
-                  <li>{nameOf(form.firstChoice)}</li>
-                  <li>{nameOf(form.secondChoice)}</li>
-                  <li>{nameOf(form.thirdChoice)}</li>
+                  {form.programChoices
+                    .map((choice, index) => ({ choice, index }))
+                    .filter((row) => row.choice.trim())
+                    .map((row) => (
+                      <li key={`review-choice-${row.index}`}>
+                        {ordinalLabel(row.index)}: {nameOf(row.choice)}
+                      </li>
+                    ))}
                 </ol>
               </ReviewBlock>
               <ReviewBlock title="3. Academic records" icon="school" onEdit={() => goToStep(3)}>
@@ -1360,13 +1534,23 @@ export function ApplicationWizard() {
                 Edit
               </button>
             </header>
-            {choiceKeys.map((key, index) => (
-              <div className="admit-side-choice" key={key}>
-                <span>{index + 1}{index === 0 ? "st" : index === 1 ? "nd" : "rd"} preference</span>
-                <strong>{nameOf(form[key])}</strong>
-                <small>HSC on draft: {hscPercent}%</small>
+            {form.programChoices.some((choice) => choice.trim()) ? (
+              form.programChoices.map((choice, index) =>
+                choice.trim() ? (
+                  <div className="admit-side-choice" key={`side-choice-${index}`}>
+                    <span>{ordinalLabel(index)} preference</span>
+                    <strong>{nameOf(choice)}</strong>
+                    {index === 0 ? <small>HSC on draft: {hscPercent}%</small> : null}
+                  </div>
+                ) : null,
+              )
+            ) : (
+              <div className="admit-side-choice">
+                <span>Preferences</span>
+                <strong>Not selected yet</strong>
+                <small>Up to 10 BS choices; repeats allowed</small>
               </div>
-            ))}
+            )}
           </section>
 
           <section className="admit-panel">

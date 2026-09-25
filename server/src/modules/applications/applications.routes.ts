@@ -13,7 +13,7 @@ export const applicationsRouter = Router();
 
 const REQUIRED_SUBMIT_DOCS = ["SSC", "HSC", "CNIC", "DOMICILE", "PHOTO"] as const;
 
-const educationLevelSchema = z.enum(["SSC", "HSC"]);
+const educationLevelSchema = z.enum(["SSC", "HSC", "DIPLOMA", "DEGREE", "EXTRA1", "EXTRA2", "EXTRA3"]);
 
 function parseMarksNumber(value: string | null | undefined): number | null {
   if (value == null) return null;
@@ -28,7 +28,17 @@ function marksValidationMessage(
   level: string,
   obtainedMarks: string | null | undefined,
   totalMarks: string | null | undefined,
+  cgpa?: string | null,
 ): string | null {
+  const cgpaRaw = cgpa?.trim() ?? "";
+  if (cgpaRaw) {
+    const value = Number(cgpaRaw);
+    if (!Number.isFinite(value) || value < 0 || value > 4) {
+      return `${level} CGPA must be a number between 0 and 4.00`;
+    }
+    return null;
+  }
+
   const obtainedRaw = obtainedMarks?.trim() ?? "";
   const totalRaw = totalMarks?.trim() ?? "";
   if (!obtainedRaw && !totalRaw) return null;
@@ -62,17 +72,19 @@ const draftEducationSchema = z
     year: z.string().max(10).optional().nullable(),
     obtainedMarks: z.string().max(20).optional().nullable(),
     totalMarks: z.string().max(20).optional().nullable(),
+    cgpa: z.string().max(20).optional().nullable(),
     rollNumber: z.string().max(60).optional().nullable(),
     institutionType: z.string().max(80).optional().nullable(),
   })
   .superRefine((row, ctx) => {
-    const message = marksValidationMessage(row.level, row.obtainedMarks, row.totalMarks);
+    const message = marksValidationMessage(row.level, row.obtainedMarks, row.totalMarks, row.cgpa);
     if (message) {
       ctx.addIssue({ code: "custom", message, path: ["obtainedMarks"] });
     }
   });
 
 const draftSchema = z.object({
+  surname: z.string().max(120).optional().nullable(),
   mobile: z.string().max(20).optional().nullable(),
   dateOfBirth: z.string().max(32).optional().nullable(),
   gender: z.string().max(20).optional().nullable(),
@@ -88,8 +100,8 @@ const draftSchema = z.object({
   hasSibling: z.boolean().optional(),
   siblingName: z.string().max(120).optional().nullable(),
   siblingRegNo: z.string().max(60).optional().nullable(),
-  programOfferingIds: z.array(z.string().min(1).max(64)).min(0).max(3).optional(),
-  education: z.array(draftEducationSchema).max(2).optional(),
+  programOfferingIds: z.array(z.string().min(1).max(64)).min(0).max(10).optional(),
+  education: z.array(draftEducationSchema).max(5).optional(),
 });
 
 type EducationRow = {
@@ -101,6 +113,7 @@ type EducationRow = {
   year: string | null;
   obtainedMarks: string | null;
   totalMarks: string | null;
+  cgpa: string | null;
   rollNumber: string | null;
   institutionType: string | null;
 };
@@ -126,11 +139,20 @@ function parseOptionalDate(value: string | null | undefined): Date | null | unde
 }
 
 async function listEducation(applicationId: string): Promise<EducationRow[]> {
-  return prisma.$queryRawUnsafe<EducationRow[]>(
-    `SELECT \`id\`, \`applicationId\`, \`level\`, \`group\`, \`board\`, \`year\`, \`obtainedMarks\`, \`totalMarks\`, \`rollNumber\`, \`institutionType\`
-     FROM \`ApplicationEducation\` WHERE \`applicationId\` = ? ORDER BY \`level\` ASC`,
-    applicationId,
-  );
+  try {
+    return await prisma.$queryRawUnsafe<EducationRow[]>(
+      `SELECT \`id\`, \`applicationId\`, \`level\`, \`group\`, \`board\`, \`year\`, \`obtainedMarks\`, \`totalMarks\`, \`cgpa\`, \`rollNumber\`, \`institutionType\`
+       FROM \`ApplicationEducation\` WHERE \`applicationId\` = ? ORDER BY \`level\` ASC`,
+      applicationId,
+    );
+  } catch {
+    const rows = await prisma.$queryRawUnsafe<Array<Omit<EducationRow, "cgpa">>>(
+      `SELECT \`id\`, \`applicationId\`, \`level\`, \`group\`, \`board\`, \`year\`, \`obtainedMarks\`, \`totalMarks\`, \`rollNumber\`, \`institutionType\`
+       FROM \`ApplicationEducation\` WHERE \`applicationId\` = ? ORDER BY \`level\` ASC`,
+      applicationId,
+    );
+    return rows.map((row) => ({ ...row, cgpa: null }));
+  }
 }
 
 async function listDocuments(applicationId: string): Promise<DocumentSummary[]> {
@@ -156,11 +178,69 @@ async function upsertEducation(
   );
   const now = new Date();
   if (existing[0]) {
+    try {
+      await prisma.$executeRawUnsafe(
+        `UPDATE \`ApplicationEducation\` SET
+          \`group\` = ?, \`board\` = ?, \`year\` = ?, \`obtainedMarks\` = ?, \`totalMarks\` = ?, \`cgpa\` = ?,
+          \`rollNumber\` = ?, \`institutionType\` = ?, \`updatedAt\` = ?
+         WHERE \`id\` = ?`,
+        row.group ?? null,
+        row.board ?? null,
+        row.year ?? null,
+        row.obtainedMarks ?? null,
+        row.totalMarks ?? null,
+        row.cgpa ?? null,
+        row.rollNumber ?? null,
+        row.institutionType ?? null,
+        now,
+        existing[0].id,
+      );
+    } catch {
+      await prisma.$executeRawUnsafe(
+        `UPDATE \`ApplicationEducation\` SET
+          \`group\` = ?, \`board\` = ?, \`year\` = ?, \`obtainedMarks\` = ?, \`totalMarks\` = ?,
+          \`rollNumber\` = ?, \`institutionType\` = ?, \`updatedAt\` = ?
+         WHERE \`id\` = ?`,
+        row.group ?? null,
+        row.board ?? null,
+        row.year ?? null,
+        row.obtainedMarks ?? null,
+        row.totalMarks ?? null,
+        row.rollNumber ?? null,
+        row.institutionType ?? null,
+        now,
+        existing[0].id,
+      );
+    }
+    return;
+  }
+  try {
     await prisma.$executeRawUnsafe(
-      `UPDATE \`ApplicationEducation\` SET
-        \`group\` = ?, \`board\` = ?, \`year\` = ?, \`obtainedMarks\` = ?, \`totalMarks\` = ?,
-        \`rollNumber\` = ?, \`institutionType\` = ?, \`updatedAt\` = ?
-       WHERE \`id\` = ?`,
+      `INSERT INTO \`ApplicationEducation\`
+        (\`id\`, \`applicationId\`, \`level\`, \`group\`, \`board\`, \`year\`, \`obtainedMarks\`, \`totalMarks\`, \`cgpa\`, \`rollNumber\`, \`institutionType\`, \`createdAt\`, \`updatedAt\`)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      randomUUID(),
+      applicationId,
+      row.level,
+      row.group ?? null,
+      row.board ?? null,
+      row.year ?? null,
+      row.obtainedMarks ?? null,
+      row.totalMarks ?? null,
+      row.cgpa ?? null,
+      row.rollNumber ?? null,
+      row.institutionType ?? null,
+      now,
+      now,
+    );
+  } catch {
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO \`ApplicationEducation\`
+        (\`id\`, \`applicationId\`, \`level\`, \`group\`, \`board\`, \`year\`, \`obtainedMarks\`, \`totalMarks\`, \`rollNumber\`, \`institutionType\`, \`createdAt\`, \`updatedAt\`)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      randomUUID(),
+      applicationId,
+      row.level,
       row.group ?? null,
       row.board ?? null,
       row.year ?? null,
@@ -169,27 +249,9 @@ async function upsertEducation(
       row.rollNumber ?? null,
       row.institutionType ?? null,
       now,
-      existing[0].id,
+      now,
     );
-    return;
   }
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO \`ApplicationEducation\`
-      (\`id\`, \`applicationId\`, \`level\`, \`group\`, \`board\`, \`year\`, \`obtainedMarks\`, \`totalMarks\`, \`rollNumber\`, \`institutionType\`, \`createdAt\`, \`updatedAt\`)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    randomUUID(),
-    applicationId,
-    row.level,
-    row.group ?? null,
-    row.board ?? null,
-    row.year ?? null,
-    row.obtainedMarks ?? null,
-    row.totalMarks ?? null,
-    row.rollNumber ?? null,
-    row.institutionType ?? null,
-    now,
-    now,
-  );
 }
 
 async function updateProfileDraft(
@@ -201,6 +263,7 @@ async function updateProfileDraft(
   await prisma.applicantProfile.update({
     where: { id: profileId },
     data: {
+      ...(data.surname !== undefined ? { surname: data.surname } : {}),
       ...(data.mobile !== undefined ? { mobile: data.mobile } : {}),
       ...(dateOfBirth !== undefined ? { dateOfBirth } : {}),
       ...(data.gender !== undefined ? { gender: data.gender } : {}),
@@ -298,6 +361,12 @@ const submit = z.object({
     .trim()
     .min(3, "Enter the father’s / guardian’s name (at least 3 characters)")
     .max(120, "Father’s name is too long"),
+  surname: z
+    .string()
+    .trim()
+    .max(120, "Surname is too long")
+    .optional()
+    .or(z.literal("")),
   cnicBform: z
     .string()
     .trim()
@@ -399,6 +468,7 @@ applicationsRouter.post("/public/submit", rateLimit(5, 60_000), async (req, res)
             create: {
               applicantName: data.applicantName,
               fatherName: data.fatherName,
+              surname: data.surname?.trim() ? data.surname.trim() : null,
               cnicBform: data.cnicBform,
               email,
               nationality: "Pakistani",
@@ -488,11 +558,6 @@ applicationsRouter.patch("/me/draft", requireAuth, async (req: AuthRequest, res)
 
   if (data.programOfferingIds && data.programOfferingIds.length > 0) {
     const uniqueIds = [...new Set(data.programOfferingIds)];
-    if (uniqueIds.length !== data.programOfferingIds.length) {
-      return res.status(400).json({
-        error: { code: "VALIDATION_ERROR", message: "Program choices must be unique" },
-      });
-    }
     const offerings = await prisma.programOffering.findMany({
       where: {
         id: { in: uniqueIds },

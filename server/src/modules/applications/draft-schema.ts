@@ -9,6 +9,24 @@ async function addColumnIfMissing(table: string, column: string, definition: str
   }
 }
 
+async function dropIndexIfExists(table: string, indexName: string) {
+  const rows = await prisma.$queryRawUnsafe<Array<{ Key_name: string }>>(
+    `SHOW INDEX FROM \`${table}\` WHERE Key_name = ?`,
+    indexName,
+  );
+  if (rows.length > 0) {
+    await prisma.$executeRawUnsafe(`ALTER TABLE \`${table}\` DROP INDEX \`${indexName}\``);
+  }
+}
+
+async function widenColumnIfNeeded(table: string, column: string, definition: string) {
+  const rows = await prisma.$queryRawUnsafe<Array<{ Type: string }>>(`SHOW COLUMNS FROM \`${table}\` LIKE '${column}'`);
+  const type = rows[0]?.Type?.toLowerCase() ?? "";
+  if (type.includes("varchar(10)")) {
+    await prisma.$executeRawUnsafe(`ALTER TABLE \`${table}\` MODIFY \`${column}\` ${definition}`);
+  }
+}
+
 /** Ensures family columns + ApplicationEducation exist (cPanel cannot always run migrate). */
 export function ensureDraftSchema() {
   if (!schemaReady) {
@@ -24,12 +42,13 @@ export function ensureDraftSchema() {
         CREATE TABLE IF NOT EXISTS \`ApplicationEducation\` (
           \`id\` VARCHAR(191) NOT NULL,
           \`applicationId\` VARCHAR(191) NOT NULL,
-          \`level\` VARCHAR(10) NOT NULL,
+          \`level\` VARCHAR(20) NOT NULL,
           \`group\` VARCHAR(80) NULL,
           \`board\` VARCHAR(120) NULL,
           \`year\` VARCHAR(10) NULL,
           \`obtainedMarks\` VARCHAR(20) NULL,
           \`totalMarks\` VARCHAR(20) NULL,
+          \`cgpa\` VARCHAR(20) NULL,
           \`rollNumber\` VARCHAR(60) NULL,
           \`institutionType\` VARCHAR(80) NULL,
           \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -42,6 +61,10 @@ export function ensureDraftSchema() {
             ON DELETE CASCADE ON UPDATE CASCADE
         ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
       `);
+
+      await widenColumnIfNeeded("ApplicationEducation", "level", "VARCHAR(20) NOT NULL");
+      await addColumnIfMissing("ApplicationEducation", "cgpa", "`cgpa` VARCHAR(20) NULL");
+      await dropIndexIfExists("ApplicationProgramChoice", "ApplicationProgramChoice_applicationId_programOfferingId_key");
 
       await prisma.$executeRawUnsafe(`
         CREATE TABLE IF NOT EXISTS \`ApplicationDocument\` (
@@ -63,6 +86,10 @@ export function ensureDraftSchema() {
             ON DELETE CASCADE ON UPDATE CASCADE
         ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
       `);
+
+      await prisma.$executeRawUnsafe(
+        `UPDATE \`AdmissionCycle\` SET \`academicYear\` = '2027', \`name\` = 'Undergraduate Admissions 2027' WHERE \`status\` = 'OPEN'`,
+      );
     })().catch((error) => {
       schemaReady = null;
       throw error;

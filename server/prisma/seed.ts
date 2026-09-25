@@ -84,11 +84,14 @@ async function main() {
 
   const cycle = await prisma.admissionCycle.upsert({
     where: { id: "00000000-0000-0000-0000-000000000026" },
-    update: {},
+    update: {
+      name: "Undergraduate Admissions 2027",
+      academicYear: "2027",
+    },
     create: {
       id: "00000000-0000-0000-0000-000000000026",
-      name: "Undergraduate Admissions 2026-2027",
-      academicYear: "2026-2027",
+      name: "Undergraduate Admissions 2027",
+      academicYear: "2027",
       applicationPrefix: "USMS-26",
       status: "OPEN",
     },

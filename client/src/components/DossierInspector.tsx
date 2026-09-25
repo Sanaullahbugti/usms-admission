@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { isClosedStatus } from "../constants/applicationStatus";
 import type {
   ApplicationDocument,
   ApplicationFile,
@@ -84,7 +85,7 @@ export function DossierInspector({
   const [documentId, setDocumentId] = useState(file.documents[0]?.id ?? "");
   const composerRef = useRef<HTMLDivElement>(null);
   const draftInputRef = useRef<HTMLTextAreaElement>(null);
-  const closed = file.status === "APPROVED" || file.status === "REJECTED";
+  const closed = isClosedStatus(file.status);
 
   useEffect(() => {
     setTab("Documents");

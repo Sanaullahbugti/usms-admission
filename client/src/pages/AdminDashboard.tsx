@@ -3,6 +3,11 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DossierInspector } from "../components/DossierInspector";
 import { StatusBadge } from "../components/StatusBadge";
+import {
+  ADMIN_FILTER_STATUSES,
+  APPLICATION_STATUS,
+  APPLICATION_STATUS_LABEL,
+} from "../constants/applicationStatus";
 import { applicationService } from "../services/applicationService";
 import type { ApplicationStatus, ChangeRequestItem, PaymentStatus } from "../types/application";
 
@@ -122,12 +127,12 @@ export function AdminDashboard() {
 
   const counts = {
     total: rows.length,
-    submitted: rows.filter((row) => row.status !== "DRAFT").length,
-    underReview: rows.filter((row) => row.status === "UNDER_REVIEW").length,
-    changeRequested: rows.filter((row) => row.status === "CHANGE_REQUESTED").length,
+    submitted: rows.filter((row) => row.status !== APPLICATION_STATUS.DRAFT).length,
+    underReview: rows.filter((row) => row.status === APPLICATION_STATUS.UNDER_REVIEW).length,
+    changeRequested: rows.filter((row) => row.status === APPLICATION_STATUS.CHANGE_REQUESTED).length,
     challanPending: rows.filter((row) => row.paymentStatus !== "VERIFIED").length,
-    approved: rows.filter((row) => row.status === "APPROVED").length,
-    rejected: rows.filter((row) => row.status === "REJECTED").length,
+    approved: rows.filter((row) => row.status === APPLICATION_STATUS.APPROVED).length,
+    rejected: rows.filter((row) => row.status === APPLICATION_STATUS.REJECTED).length,
   };
 
   return (
@@ -163,12 +168,11 @@ export function AdminDashboard() {
               Status
               <select value={status} onChange={(event) => setStatus(event.target.value as ApplicationStatus | "ALL")}>
                 <option value="ALL">All statuses</option>
-                <option value="SUBMITTED">Submitted</option>
-                <option value="UNDER_REVIEW">Under review</option>
-                <option value="CHANGE_REQUESTED">Change requested</option>
-                <option value="DOCUMENTS_VERIFIED">Documents verified</option>
-                <option value="APPROVED">Approved</option>
-                <option value="REJECTED">Rejected</option>
+                {ADMIN_FILTER_STATUSES.map((value) => (
+                  <option key={value} value={value}>
+                    {APPLICATION_STATUS_LABEL[value]}
+                  </option>
+                ))}
               </select>
             </label>
             <label>

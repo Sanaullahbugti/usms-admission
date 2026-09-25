@@ -212,12 +212,13 @@ model ApplicantProfile {
 model ApplicationEducation {
   id              String      @id @default(uuid())
   applicationId   String
-  level           String      @db.VarChar(10)
+  level           String      @db.VarChar(20)
   group           String?     @db.VarChar(80)
   board           String?     @db.VarChar(120)
   year            String?     @db.VarChar(10)
   obtainedMarks   String?     @db.VarChar(20)
   totalMarks      String?     @db.VarChar(20)
+  cgpa            String?     @db.VarChar(20)
   rollNumber      String?     @db.VarChar(60)
   institutionType String?     @db.VarChar(80)
   createdAt       DateTime    @default(now())
@@ -237,5 +238,6 @@ model ApplicationProgramChoice {
   programOffering   ProgramOffering @relation(fields: [programOfferingId], references: [id])
 
   @@unique([applicationId, preferenceOrder])
-  @@unique([applicationId, programOfferingId])
+  @@index([applicationId])
+  @@index([programOfferingId])
 }

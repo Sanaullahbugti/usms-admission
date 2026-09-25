@@ -100,7 +100,7 @@ export function AdminLayout() {
         <header className="cc-top">
           <div className="cc-cycle">
             <span className="cc-live" aria-hidden="true" />
-            <strong>Undergraduate Admission Cycle 2026-2027</strong>
+            <strong>Undergraduate Admission Cycle 2027</strong>
             <span className="cc-session">Active session</span>
           </div>
           <div className="cc-top-tools">

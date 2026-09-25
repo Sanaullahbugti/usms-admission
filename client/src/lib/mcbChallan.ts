@@ -40,8 +40,8 @@ export function splitSurname(fullName: string) {
 }
 
 export function nextChallanNo(applicationNo: string) {
-  const suffix = applicationNo.replace(/\D/g, "").slice(-6) || String(Date.now()).slice(-6);
-  return `MCB-${suffix}`;
+  const value = applicationNo.trim();
+  return value || "PENDING";
 }
 
 function clip(value: string, max: number) {
@@ -179,11 +179,11 @@ function drawCopy(
 
   cursor -= 12;
   page.drawText("No.", { x: innerX, y: cursor, size: 7, font: fonts.romanBold, color: ink });
-  drawRule(page, innerX + 16, cursor, 54);
-  page.drawText(clip(data.challanNo, 14), {
+  drawRule(page, innerX + 16, cursor, 78);
+  page.drawText(clip(data.challanNo || data.applicationNo, 18), {
     x: innerX + 18,
     y: cursor + 1.5,
-    size: 7,
+    size: 6.5,
     font: fonts.romanBold,
     color: ink,
   });

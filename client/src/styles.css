@@ -570,6 +570,10 @@ th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spa
 .admit-field { display: flex; flex-direction: column; gap: 6px; }
 .admit-field > span { font-size: 12px; font-weight: 600; color: var(--primary); }
 .admit-field small { color: var(--secondary); font-size: 11px; font-weight: 600; }
+.admit-field.is-invalid input,
+.admit-field.is-invalid select,
+.admit-field.is-invalid textarea { border-color: #b42318; }
+.admit-field-error { color: #b42318; font-size: 12px; font-weight: 600; margin: 0 0 10px; }
 .admit input.is-revise {
   border: 2px solid var(--secondary);
   font-weight: 700;
@@ -799,6 +803,17 @@ th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spa
   }
   .admit-footer, .admit-doc, .admit-footer-left { flex-direction: column; align-items: stretch; }
   .admit-btn { width: 100%; }
+  .admit-card input,
+  .admit-card select,
+  .admit-card textarea {
+    font-size: 16px;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .admit-card input,
+  .admit-card select {
+    min-height: 44px;
+  }
 }
 
 .admit-doc.is-invalid {
@@ -1458,6 +1473,7 @@ th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spa
   flex-direction: column;
   background: var(--bg);
   color: var(--text);
+  overflow-x: clip;
 }
 .portal-header {
   position: sticky;
@@ -1466,7 +1482,7 @@ th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spa
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   padding: 12px 24px;
   background: white;
   border-bottom: 1px solid var(--outline);
@@ -1475,14 +1491,21 @@ th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spa
 .portal-brand {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
+  min-width: 0;
   color: inherit;
+}
+.portal-brand > div {
+  min-width: 0;
 }
 .portal-brand strong {
   display: block;
   color: var(--primary);
   font-size: 18px;
   letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .portal-brand small {
   display: block;
@@ -1490,11 +1513,17 @@ th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spa
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .portal-login {
+  flex-shrink: 0;
   color: var(--primary);
   font-size: 13px;
   font-weight: 600;
+  padding: 8px 0;
+  white-space: nowrap;
 }
 .portal-main {
   width: min(920px, calc(100% - 32px));
@@ -1510,25 +1539,58 @@ th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spa
 }
 .portal-card--narrow { max-width: 520px; margin: 0 auto; }
 .portal-card-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
+  display: block;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--outline);
+}
+.portal-card-copy {
+  min-width: 0;
+}
+.portal-card-kicker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 4px;
+}
+.portal-card-kicker .eyebrow {
+  margin: 0;
 }
 .portal-card h1 {
   margin: 4px 0 8px;
   color: var(--primary);
-  font-size: 22px;
-  line-height: 28px;
+  font-size: clamp(1.25rem, 2.5vw, 1.4rem);
+  line-height: 1.25;
   letter-spacing: -0.015em;
 }
-.portal-lede { margin: 0; color: var(--muted); font-size: 14px; line-height: 20px; max-width: 62ch; }
+.portal-lede { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.45; max-width: 62ch; }
+.portal-note {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fff8e8;
+  border: 1px solid #f0e0b8;
+  color: #7a5b12;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.admit-note {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff8e8;
+  border: 1px solid #f0e0b8;
+  color: #7a5b12;
+  font-size: 13px;
+  line-height: 1.4;
+}
 .portal-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  align-self: flex-start;
+  width: fit-content;
+  max-width: 100%;
   white-space: nowrap;
   padding: 4px 10px;
   border-radius: 4px;
@@ -1539,34 +1601,62 @@ th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spa
 }
 .portal-pill .ms { font-size: 16px; }
 .portal-form { margin-top: 20px; }
-.portal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.portal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
 .portal-grid--one { grid-template-columns: 1fr; }
 .portal-form label {
   display: grid;
+  grid-template-rows: auto auto auto;
+  align-content: start;
   gap: 6px;
+  min-width: 0;
   color: var(--primary);
   font-size: 12px;
   font-weight: 600;
 }
+.portal-label-text {
+  display: flex;
+  align-items: flex-end;
+  min-height: 2.4em;
+  line-height: 1.2;
+}
 .portal-form input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 44px;
+  min-height: 44px;
+  border: 1px solid var(--outline);
   border-radius: 4px;
   padding: 10px 12px;
   background: white;
+  font-size: 16px;
+  line-height: 1.2;
 }
 .portal-form input:focus {
-  outline: none;
+  outline: 2px solid color-mix(in srgb, var(--secondary) 70%, white);
+  outline-offset: 1px;
   border-color: var(--secondary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--secondary) 18%, transparent);
+  box-shadow: none;
 }
 .portal-form label.is-invalid input {
   border-color: #b42318;
 }
+.portal-field-meta {
+  display: block;
+  min-height: 1.25em;
+  line-height: 1.25;
+}
 .portal-field-error {
+  display: block;
   color: #b42318;
   font-size: 12px;
   font-weight: 600;
 }
 .portal-field-hint {
+  display: block;
   color: var(--muted);
   font-size: 12px;
   font-weight: 500;
@@ -1587,13 +1677,15 @@ th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spa
   align-items: center;
   justify-content: center;
   width: 100%;
+  min-height: 48px;
   margin-top: 18px;
   padding: 12px 18px;
   border-radius: 4px;
   background: var(--primary);
   color: white;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
+  text-align: center;
 }
 .portal-submit:hover { background: var(--primary-container); }
 .portal-form > small, .portal-success > small {
@@ -1615,7 +1707,40 @@ th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spa
 }
 .portal-success-mark .ms { font-size: 32px; }
 @media (max-width: 720px) {
-  .portal-grid, .portal-card-head { grid-template-columns: 1fr; display: grid; }
+  .portal-header {
+    padding: 10px 14px;
+  }
+  .portal-header .usms-logo {
+    width: 44px;
+    height: 44px;
+  }
+  .portal-brand {
+    gap: 10px;
+  }
+  .portal-brand strong {
+    font-size: 15px;
+  }
+  .portal-brand small {
+    font-size: 10px;
+    letter-spacing: 0.02em;
+  }
+  .portal-login {
+    font-size: 12px;
+  }
+  .portal-main {
+    width: calc(100% - 24px);
+    padding: 16px 0 max(40px, env(safe-area-inset-bottom));
+  }
+  .portal-card {
+    padding: 16px;
+  }
+  .portal-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .portal-lede {
+    font-size: 13px;
+  }
 }
 
 .public-page {
@@ -1749,9 +1874,10 @@ th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spa
 .success-card p { color: var(--muted); }
 .credential-box {
   display: grid;
-  gap: 4px;
-  margin: 20px 0;
-  padding: 16px;
+  gap: 4px 12px;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  margin: 18px 0;
+  padding: 14px;
   background: var(--surface-low);
   border: 1px solid var(--outline);
   border-radius: 8px;
@@ -1765,12 +1891,19 @@ th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spa
   text-transform: uppercase;
 }
 .credential-box strong {
+  min-width: 0;
   margin-bottom: 10px;
+  overflow-wrap: anywhere;
   color: var(--primary);
   font-size: 18px;
   word-break: break-word;
 }
 .credential-box strong:last-child { margin-bottom: 0; }
+@media (max-width: 720px) {
+  .credential-box {
+    grid-template-columns: 1fr;
+  }
+}
 .button-link {
   display: inline-block;
   margin-top: 8px;
